@@ -6,8 +6,8 @@ from flask_cors import CORS
 from gigachat import GigaChat
 import json
 import os
-from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import Mail
+import requests
+from datetime import datetime
 
 app = Flask(__name__)
 CORS(app)
@@ -22,69 +22,37 @@ GIGACHAT_CREDENTIALS = {
     "model": "GigaChat"
 }
 
+# ⚠️ ВАЖНО: Укажите URL вашего Apps Script для сохранения в Google Sheets
+# Замените на ваш URL из шага 3
+SAVE_TO_SHEETS_URL = "https://script.google.com/macros/s/AKfycbw23tamPZcP3VTYP6nHIJacjGChp6XryrRXGPY_ogU3ww1n5AiEqa2G0V5P0SNZO4KGkw/exec"
+
 # ============================================================
-# ФУНКЦИЯ ДЛЯ ОТПРАВКИ EMAIL ЧЕРЕЗ SENDGRID
+# ФУНКЦИЯ ДЛЯ СОХРАНЕНИЯ РЕКОМЕНДАЦИЙ В GOOGLE SHEETS
 # ============================================================
-def send_email(to_email, user_name, recommendations):
-    """Отправляет письмо через Resend API"""
+def save_recommendations_to_sheets(user_name, user_email, recommendations):
+    """Сохраняет рекомендации в Google Sheets через Apps Script"""
     try:
-        resend_api_key = os.environ.get("RESEND_API_KEY")
+        payload = {
+            "userName": user_name,
+            "userEmail": user_email,
+            "recommendations": recommendations,
+            "timestamp": datetime.now().isoformat()
+        }
         
-        if not resend_api_key:
-            print("❌ RESEND_API_KEY не найден в переменных окружения")
-            return False
+        print(f"📤 Отправка рекомендаций в Google Sheets...")
         
-        import requests
-        
-        first_name = user_name.split()[0] if user_name else "Пользователь"
-        
-        html_content = f"""
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: #f9fafb; border-radius: 12px;">
-            <div style="background: #1f6e8c; padding: 20px; border-radius: 12px 12px 0 0; color: white; text-align: center;">
-                <h1 style="margin: 0;">CSM 2.0</h1>
-                <p>Результаты оценки компетенций</p>
-            </div>
-            <div style="background: white; padding: 20px; border-radius: 0 0 12px 12px;">
-                <h2 style="color: #1f6e8c;">Здравствуйте, {first_name}!</h2>
-                <p>Вы недавно прошли самооценку и тест по компетенциям <strong>CSM 2.0</strong>.</p>
-                <div style="background: #e8f4f8; padding: 15px; border-radius: 8px; margin: 20px 0;">
-                    <h3 style="color: #1f6e8c; margin-top: 0;">📋 Рекомендации:</h3>
-                    <div style="line-height: 1.6;">
-                        {recommendations.replace(chr(10), '<br>')}
-                    </div>
-                </div>
-                <hr style="margin: 20px 0;">
-                <p style="color: #6b7280; font-size: 12px; text-align: center;">
-                    Это автоматическое сообщение, пожалуйста, не отвечайте на него.<br>
-                    © CSM 2.0 — Программа развития компетенций
-                </p>
-            </div>
-        </div>
-        """
-        
-        response = requests.post(
-            "https://api.resend.com/emails",
-            headers={
-                "Authorization": f"Bearer {resend_api_key}",
-                "Content-Type": "application/json"
-            },
-            json={
-                "from": "noreply@resend.dev",  # Бесплатный отправитель Resend
-                "to": to_email,
-                "subject": "📊 Результаты оценки компетенций CSM 2.0",
-                "html": html_content
-            }
-        )
+        # Отправляем в Google Sheets
+        response = requests.post(SAVE_TO_SHEETS_URL, json=payload)
         
         if response.status_code == 200:
-            print(f"✅ Письмо отправлено на {to_email} через Resend")
+            print(f"✅ Рекомендации сохранены в Google Sheets")
             return True
         else:
-            print(f"❌ Ошибка Resend: {response.status_code} - {response.text}")
+            print(f"❌ Ошибка сохранения: {response.status_code} - {response.text}")
             return False
             
     except Exception as e:
-        print(f"❌ Ошибка отправки письма: {e}")
+        print(f"❌ Ошибка при сохранении: {e}")
         return False
 
 # ============================================================
@@ -146,7 +114,7 @@ def index():
 
 @app.route('/health', methods=['GET'])
 def health():
-    return jsonify({"status": "healthy", "timestamp": str(__import__('datetime').datetime.now())})
+    return jsonify({"status": "healthy", "timestamp": str(datetime.now())})
 
 @app.route('/recommend', methods=['POST'])
 def recommend():
@@ -161,20 +129,20 @@ def recommend():
         
         # Получаем рекомендации от GigaChat
         recommendations = get_gigachat_recommendations(user_name, self_ratings, test_scores)
-        print(f"💡 Рекомендации получены")
+        print(f"💡 Рекомендации получены от GigaChat")
         
-        # Отправляем email через SendGrid
-        email_sent = send_email(user_email, user_name, recommendations)
+        # Сохраняем рекомендации в Google Sheets
+        saved = save_recommendations_to_sheets(user_name, user_email, recommendations)
         
-        if email_sent:
+        if saved:
             return jsonify({
                 "success": True,
-                "message": "Рекомендации отправлены на email"
+                "message": "Рекомендации сохранены в Google Sheets. Письмо будет отправлено автоматически."
             })
         else:
             return jsonify({
                 "success": False,
-                "message": "Не удалось отправить email"
+                "message": "Не удалось сохранить рекомендации"
             }), 500
         
     except Exception as e:
