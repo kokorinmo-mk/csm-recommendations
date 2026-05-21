@@ -26,13 +26,15 @@ GIGACHAT_CREDENTIALS = {
 # ФУНКЦИЯ ДЛЯ ОТПРАВКИ EMAIL ЧЕРЕЗ SENDGRID
 # ============================================================
 def send_email(to_email, user_name, recommendations):
-    """Отправляет письмо через SendGrid API"""
+    """Отправляет письмо через Resend API"""
     try:
-        sendgrid_api_key = os.environ.get("SENDGRID_API_KEY")
+        resend_api_key = os.environ.get("RESEND_API_KEY")
         
-        if not sendgrid_api_key:
-            print("❌ SENDGRID_API_KEY не найден в переменных окружения")
+        if not resend_api_key:
+            print("❌ RESEND_API_KEY не найден в переменных окружения")
             return False
+        
+        import requests
         
         first_name = user_name.split()[0] if user_name else "Пользователь"
         
@@ -60,21 +62,25 @@ def send_email(to_email, user_name, recommendations):
         </div>
         """
         
-        message = Mail(
-            from_email='noreply@csm-recommendations.onrender.com',
-            to_emails=to_email,
-            subject='📊 Результаты оценки компетенций CSM 2.0',
-            html_content=html_content
+        response = requests.post(
+            "https://api.resend.com/emails",
+            headers={
+                "Authorization": f"Bearer {resend_api_key}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "from": "noreply@resend.dev",  # Бесплатный отправитель Resend
+                "to": to_email,
+                "subject": "📊 Результаты оценки компетенций CSM 2.0",
+                "html": html_content
+            }
         )
         
-        sg = SendGridAPIClient(sendgrid_api_key)
-        response = sg.send(message)
-        
-        if response.status_code == 202:
-            print(f"✅ Письмо отправлено на {to_email} через SendGrid")
+        if response.status_code == 200:
+            print(f"✅ Письмо отправлено на {to_email} через Resend")
             return True
         else:
-            print(f"❌ Ошибка SendGrid: {response.status_code}")
+            print(f"❌ Ошибка Resend: {response.status_code} - {response.text}")
             return False
             
     except Exception as e:
