@@ -1,59 +1,42 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-import signal
-import sys
-import time
-
-# Увеличиваем таймаут для GigaChat
-signal.signal(signal.SIGALRM, lambda x, y: None)
-
-import os
-import sys
-print("Current directory:", os.getcwd())
-print("Python path:", sys.path)
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from gigachat import GigaChat
 import json
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
+import os
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import Mail
 
 app = Flask(__name__)
 CORS(app)
 
 # ============================================================
-# НАСТРОЙКИ - ЗАМЕНИТЕ НА ВАШИ ДАННЫЕ
+# НАСТРОЙКИ - читаем из переменных окружения Render
 # ============================================================
 GIGACHAT_CREDENTIALS = {
-    "credentials": "MDE5ZDI0NDctNjhmMy03MjU5LTk1M2MtZTYwNzVjYjllNmI1Ojk3NGJiODMwLWM2ZDMtNGNkMi1hMTVkLTU1MjY0YTgxNjZkMQ==",  # Вставьте ваш Client Secret
+    "credentials": os.environ.get("GIGACHAT_CREDENTIALS", ""),
     "scope": "GIGACHAT_API_PERS",
     "verify_ssl_certs": False,
     "model": "GigaChat"
 }
 
-# Email настройки (Gmail)
-EMAIL_CONFIG = {
-    "smtp_server": "smtp.gmail.com",
-    "smtp_port": 587,
-    "email_user": "kokorinmo@gmail.com",  # Ваш Gmail
-    "email_password": "dpxv bnag pgne mpdp"   # Пароль приложения
-}
-
 # ============================================================
-# ФУНКЦИЯ ДЛЯ ОТПРАВКИ EMAIL
+# ФУНКЦИЯ ДЛЯ ОТПРАВКИ EMAIL ЧЕРЕЗ SENDGRID
 # ============================================================
 def send_email(to_email, user_name, recommendations):
+    """Отправляет письмо через SendGrid API"""
     try:
-        msg = MIMEMultipart()
-        msg['From'] = EMAIL_CONFIG['email_user']
-        msg['To'] = to_email
-        msg['Subject'] = "📊 Результаты оценки компетенций CSM 2.0"
+        sendgrid_api_key = os.environ.get("SENDGRID_API_KEY")
+        
+        if not sendgrid_api_key:
+            print("❌ SENDGRID_API_KEY не найден в переменных окружения")
+            return False
         
         first_name = user_name.split()[0] if user_name else "Пользователь"
         
-        html = f"""
+        html_content = f"""
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: #f9fafb; border-radius: 12px;">
             <div style="background: #1f6e8c; padding: 20px; border-radius: 12px 12px 0 0; color: white; text-align: center;">
                 <h1 style="margin: 0;">CSM 2.0</h1>
@@ -77,16 +60,23 @@ def send_email(to_email, user_name, recommendations):
         </div>
         """
         
-        msg.attach(MIMEText(html, 'html'))
+        message = Mail(
+            from_email='noreply@csm-recommendations.onrender.com',
+            to_emails=to_email,
+            subject='📊 Результаты оценки компетенций CSM 2.0',
+            html_content=html_content
+        )
         
-        server = smtplib.SMTP(EMAIL_CONFIG['smtp_server'], EMAIL_CONFIG['smtp_port'])
-        server.starttls()
-        server.login(EMAIL_CONFIG['email_user'], EMAIL_CONFIG['email_password'])
-        server.send_message(msg)
-        server.quit()
+        sg = SendGridAPIClient(sendgrid_api_key)
+        response = sg.send(message)
         
-        print(f"✅ Письмо отправлено на {to_email}")
-        return True
+        if response.status_code == 202:
+            print(f"✅ Письмо отправлено на {to_email} через SendGrid")
+            return True
+        else:
+            print(f"❌ Ошибка SendGrid: {response.status_code}")
+            return False
+            
     except Exception as e:
         print(f"❌ Ошибка отправки письма: {e}")
         return False
@@ -124,7 +114,7 @@ N. [Название области] (Почему? На что обратить
             scope=GIGACHAT_CREDENTIALS["scope"],
             verify_ssl_certs=False,
             model=GIGACHAT_CREDENTIALS["model"],
-            timeout=120  # 👈 Увеличиваем таймаут до 120 секунд
+            timeout=120
         ) as giga:
             response = giga.chat(prompt)
             return response.choices[0].message.content
@@ -167,7 +157,7 @@ def recommend():
         recommendations = get_gigachat_recommendations(user_name, self_ratings, test_scores)
         print(f"💡 Рекомендации получены")
         
-        # Отправляем email
+        # Отправляем email через SendGrid
         email_sent = send_email(user_email, user_name, recommendations)
         
         if email_sent:
@@ -187,5 +177,4 @@ def recommend():
 
 if __name__ == '__main__':
     print("🚀 Запуск сервера CSM 2.0...")
-    print("📍 Сервер доступен по адресу: http://localhost:5000")
     app.run(host='0.0.0.0', port=5000, debug=True)
