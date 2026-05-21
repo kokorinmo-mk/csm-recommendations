@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+import os
+import sys
+print("Current directory:", os.getcwd())
+print("Python path:", sys.path)
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS
