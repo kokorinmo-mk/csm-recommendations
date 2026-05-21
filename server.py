@@ -95,6 +95,9 @@ def send_email(to_email, user_name, recommendations):
 # ФУНКЦИЯ ДЛЯ РАБОТЫ С GigaChat
 # ============================================================
 def get_gigachat_recommendations(user_name, self_ratings, test_scores):
+    """Отправляет запрос к GigaChat и возвращает рекомендации"""
+    
+    # Формируем промпт
     prompt = f"""
 Ты — эксперт по компетенциям CSM 2.0. Пользователь прошёл самооценку и тест.
 
@@ -115,7 +118,14 @@ N. [Название области] (Почему? На что обратить
 """
 
     try:
-        with GigaChat(**GIGACHAT_CREDENTIALS) as giga:
+        # Подключаемся к GigaChat с увеличенным таймаутом
+        with GigaChat(
+            credentials=GIGACHAT_CREDENTIALS["credentials"],
+            scope=GIGACHAT_CREDENTIALS["scope"],
+            verify_ssl_certs=False,
+            model=GIGACHAT_CREDENTIALS["model"],
+            timeout=120  # 👈 Увеличиваем таймаут до 120 секунд
+        ) as giga:
             response = giga.chat(prompt)
             return response.choices[0].message.content
     except Exception as e:
