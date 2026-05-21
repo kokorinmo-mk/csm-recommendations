@@ -3,5 +3,5 @@ services:
     name: csm-recommendations
     runtime: python
     buildCommand: pip install -r requirements.txt
-    startCommand: python server.py
+    startCommand: gunicorn server:app --timeout 120 --workers 1
     plan: free
