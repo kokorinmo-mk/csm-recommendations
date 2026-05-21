@@ -1,5 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+import signal
+import sys
+import time
+
+# Увеличиваем таймаут для GigaChat
+signal.signal(signal.SIGALRM, lambda x, y: None)
+
 import os
 import sys
 print("Current directory:", os.getcwd())
