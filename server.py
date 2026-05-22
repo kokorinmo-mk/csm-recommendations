@@ -13,7 +13,7 @@ app = Flask(__name__)
 CORS(app)
 
 # ============================================================
-# НАСТРОЙКИ - читаем из переменных окружения Render
+# КОНФИГУРАЦИЯ
 # ============================================================
 GIGACHAT_CREDENTIALS = {
     "credentials": os.environ.get("GIGACHAT_CREDENTIALS", ""),
@@ -22,15 +22,35 @@ GIGACHAT_CREDENTIALS = {
     "model": "GigaChat"
 }
 
-# ⚠️ ВАЖНО: Укажите URL вашего Apps Script для сохранения в Google Sheets
-# Замените на ваш URL из шага 3
+# URL для получения материалов из Google Sheets (твой новый скрипт)
+MATERIALS_URL = "https://script.google.com/macros/s/AKfycbzOlrBj4ZY5iqStx3gUiF3Duecu0W8X26BfFsvNWJ6CoRLU7Hf2B7jDHnLVX4qE9m9w/exec"
+
+# URL для сохранения рекомендаций в Google Sheets
 SAVE_TO_SHEETS_URL = "https://script.google.com/macros/s/AKfycbw23tamPZcP3VTYP6nHIJacjGChp6XryrRXGPY_ogU3ww1n5AiEqa2G0V5P0SNZO4KGkw/exec"
 
 # ============================================================
-# ФУНКЦИЯ ДЛЯ СОХРАНЕНИЯ РЕКОМЕНДАЦИЙ В GOOGLE SHEETS
+# ЗАГРУЗКА МАТЕРИАЛОВ ИЗ GOOGLE SHEETS
+# ============================================================
+def load_materials_from_sheets():
+    """Загружает курсы из листа 'Материалы для рекомендаций'"""
+    try:
+        response = requests.get(MATERIALS_URL)
+        if response.status_code == 200:
+            materials = response.json()
+            print(f"✅ Загружено {len(materials)} материалов")
+            return materials
+        else:
+            print(f"❌ Ошибка загрузки материалов: {response.status_code}")
+            return {}
+    except Exception as e:
+        print(f"❌ Ошибка при загрузке материалов: {e}")
+        return {}
+
+# ============================================================
+# СОХРАНЕНИЕ РЕКОМЕНДАЦИЙ В GOOGLE SHEETS
 # ============================================================
 def save_recommendations_to_sheets(user_name, user_email, recommendations):
-    """Сохраняет рекомендации в Google Sheets через Apps Script"""
+    """Сохраняет рекомендации в Google Sheets"""
     try:
         payload = {
             "userName": user_name,
@@ -38,30 +58,30 @@ def save_recommendations_to_sheets(user_name, user_email, recommendations):
             "recommendations": recommendations,
             "timestamp": datetime.now().isoformat()
         }
-        
-        print(f"📤 Отправка рекомендаций в Google Sheets...")
-        
-        # Отправляем в Google Sheets
         response = requests.post(SAVE_TO_SHEETS_URL, json=payload)
-        
         if response.status_code == 200:
-            print(f"✅ Рекомендации сохранены в Google Sheets")
+            print(f"✅ Рекомендации сохранены в Sheets")
             return True
         else:
-            print(f"❌ Ошибка сохранения: {response.status_code} - {response.text}")
+            print(f"❌ Ошибка сохранения: {response.status_code}")
             return False
-            
     except Exception as e:
-        print(f"❌ Ошибка при сохранении: {e}")
+        print(f"❌ Ошибка: {e}")
         return False
 
 # ============================================================
-# ФУНКЦИЯ ДЛЯ РАБОТЫ С GigaChat
+# ФОРМИРОВАНИЕ ПРОМПТА С МАТЕРИАЛАМИ
 # ============================================================
-def get_gigachat_recommendations(user_name, self_ratings, test_scores):
-    """Отправляет запрос к GigaChat и возвращает рекомендации"""
+def build_prompt(user_name, self_ratings, test_scores, materials):
+    """Формирует промпт для GigaChat с учётом загруженных материалов"""
     
-    # Формируем промпт
+    # Форматируем материалы для промпта
+    materials_text = ""
+    for area, courses in materials.items():
+        materials_text += f"\n### {area}\n"
+        for course in courses[:5]:  # Ограничиваем до 5 курсов на область, чтобы не перегружать
+            materials_text += f"- [{course['name']}]({course['url']}) — {course['description']}\n"
+    
     prompt = f"""
 Ты — эксперт по компетенциям CSM 2.0. Пользователь прошёл самооценку и тест.
 
@@ -74,15 +94,29 @@ def get_gigachat_recommendations(user_name, self_ratings, test_scores):
 Результаты теста (проценты правильных ответов):
 {json.dumps(test_scores, ensure_ascii=False, indent=2)}
 
-Сформируй ТОП-3 области компетенций, которые требуют развития.
-Для каждой области напиши в формате:
-N. [Название области] (Почему? На что обратить внимание? Какие материалы изучить?)
+### Доступные обучающие материалы:
+{materials_text}
 
-Будь конкретным, дружелюбным. Ответ только на русском языке.
+### Твоя задача:
+1. Если ВСЕ оценки = 10 И ВСЕ тесты = 100, напиши поздравительное сообщение с предложением стать наставником.
+2. ИНАЧЕ: определи ТОП-3 области с самыми низкими результатами.
+3. Для каждой из этих областей выбери 1-2 подходящих курса из списка выше и добавь их в рекомендацию.
+
+Формат ответа:
+N. [Название области] (Почему это зона роста? На что обратить внимание?)
+   📚 Рекомендуемый материал: [Название курса](ссылка) — почему он поможет.
+
+Будь конкретным, дружелюбным. Используй имя {user_name}. Ответ только на русском языке.
 """
+    return prompt
 
+# ============================================================
+# РАБОТА С GigaChat
+# ============================================================
+def get_gigachat_recommendations(user_name, self_ratings, test_scores, materials):
+    prompt = build_prompt(user_name, self_ratings, test_scores, materials)
+    
     try:
-        # Подключаемся к GigaChat с увеличенным таймаутом
         with GigaChat(
             credentials=GIGACHAT_CREDENTIALS["credentials"],
             scope=GIGACHAT_CREDENTIALS["scope"],
@@ -98,15 +132,13 @@ N. [Название области] (Почему? На что обратить
 
 def get_fallback_recommendations():
     return """
-1. Область 1. Осознание (Рекомендуется изучить современные тренды: AI, Big Data, IoT, Cloud. Обратите внимание на архитектуру цифровой трансформации.)
-
-2. Область 2. Стратегия (Развивайте стратегическое мышление, изучите Business Model Canvas и карту гипотез.)
-
-3. Область 6. Общесистемные компетенции (Освойте инструменты CSM и генеративные модели вроде GigaChat для повышения эффективности.)
+1. Область 1. Осознание (Изучите тренды AI, Big Data, Cloud. Рекомендуем курс «Введение в искусственный интеллект»)
+2. Область 2. Стратегия (Изучите Business Model Canvas. Курс «Стратегия Сбера»)
+3. Область 6. Общесистемные компетенции (Освойте GigaChat. Курс «Работа с LLM GigaChat»)
 """
 
 # ============================================================
-# ЭНДПОИНТЫ СЕРВЕРА
+# ЭНДПОИНТЫ
 # ============================================================
 @app.route('/', methods=['GET'])
 def index():
@@ -127,23 +159,23 @@ def recommend():
         self_ratings = data.get('selfRatings', [])
         test_scores = data.get('testScores', [])
         
+        # Загружаем материалы из Google Sheets
+        materials = load_materials_from_sheets()
+        
         # Получаем рекомендации от GigaChat
-        recommendations = get_gigachat_recommendations(user_name, self_ratings, test_scores)
+        recommendations = get_gigachat_recommendations(user_name, self_ratings, test_scores, materials)
         print(f"💡 Рекомендации получены от GigaChat")
         
-        # Сохраняем рекомендации в Google Sheets
+        # Сохраняем в Google Sheets
         saved = save_recommendations_to_sheets(user_name, user_email, recommendations)
         
         if saved:
             return jsonify({
                 "success": True,
-                "message": "Рекомендации сохранены в Google Sheets. Письмо будет отправлено автоматически."
+                "message": "Рекомендации сохранены. Письмо будет отправлено автоматически."
             })
         else:
-            return jsonify({
-                "success": False,
-                "message": "Не удалось сохранить рекомендации"
-            }), 500
+            return jsonify({"success": False, "message": "Ошибка сохранения"}), 500
         
     except Exception as e:
         print(f"❌ Ошибка: {e}")
