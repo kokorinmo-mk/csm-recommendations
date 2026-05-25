@@ -4,6 +4,7 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from gigachat import GigaChat
+from datetime import datetime
 import json
 import os
 import requests
@@ -203,7 +204,8 @@ def get_gigachat_recommendations(user_name, self_ratings, test_scores, materials
             model=GIGACHAT_CREDENTIALS["model"],
             timeout=120
         ) as giga:
-            response = giga.chat(prompt, max_tokens=2000)
+            # Убираем max_tokens — библиотека не поддерживает
+            response = giga.chat(prompt)
             result = response.choices[0].message.content
             
             print(f"\n{'='*80}")
@@ -221,6 +223,14 @@ def get_gigachat_recommendations(user_name, self_ratings, test_scores, materials
         print(f"   Текст: {e}")
         print(f"{'='*80}\n")
         return get_fallback_recommendations()
+            
+    except Exception as e:
+        print(f"\n{'='*80}")
+        print(f"❌ ОШИБКА GIGACHAT:")
+        print(f"   Тип ошибки: {type(e).__name__}")
+        print(f"   Текст: {e}")
+        print(f"{'='*80}\n")
+        return get_fallback_recommendations()
         
 def index():
     return jsonify({"status": "OK", "message": "Сервер CSM 2.0 работает!"})
@@ -230,6 +240,61 @@ def health():
     return jsonify({"status": "healthy", "timestamp": str(datetime.now())})
 
 @app.route('/recommend', methods=['POST'])
+
+def get_fallback_recommendations():
+    """Рекомендации на случай, если GigaChat недоступен, и уведомление об ошибке"""
+    
+    # Отправляем письмо с ошибкой на твой email
+    try:
+        import requests
+        resend_api_key = os.environ.get("RESEND_API_KEY")
+        
+        if resend_api_key:
+            error_message = f"""
+❌ ОШИБКА СЕРВЕРА CSM 2.0
+
+GigaChat не ответил на запрос. Возможные причины:
+1. Неверные credentials
+2. Проблемы с подключением к API
+3. Превышение лимитов
+
+Проверь:
+- Переменные окружения GIGACHAT_CREDENTIALS
+- Логи Render выше
+- Статус сервиса GigaChat
+
+Время ошибки: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+"""
+            
+            requests.post(
+                "https://api.resend.com/emails",
+                headers={
+                    "Authorization": f"Bearer {resend_api_key}",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "from": "noreply@resend.dev",
+                    "to": "kokorinmo@gmail.com",  # твой email
+                    "subject": "⚠️ Ошибка сервера CSM 2.0: GigaChat не отвечает",
+                    "html": error_message.replace("\n", "<br>")
+                },
+                timeout=10
+            )
+            print("📧 Письмо с ошибкой отправлено на kokorinmo@gmail.com")
+    except Exception as e:
+        print(f"❌ Не удалось отправить письмо об ошибке: {e}")
+    
+    # Возвращаем понятное сообщение для пользователя
+    return """
+❌ **Временные технические сложности**
+
+К сожалению, сервис генерации рекомендаций временно недоступен. Наши специалисты уже работают над устранением проблемы.
+
+Пожалуйста, попробуйте пройти тест позже.
+
+Приносим извинения за неудобства!
+"""
+
 def recommend():
     try:
         data = request.get_json()
