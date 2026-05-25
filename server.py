@@ -177,20 +177,21 @@ def build_prompt(user_name, self_ratings, test_scores, materials):
 def get_gigachat_recommendations(user_name, self_ratings, test_scores, materials):
     """Отправляет запрос к GigaChat и возвращает рекомендации"""
     
-    # Диагностика - выводим полученные данные
-    print(f"🔍 ДИАГНОСТИКА:")
-    print(f"   - Имя пользователя: {user_name}")
-    print(f"   - Самооценка (первые 10 значений): {self_ratings[:10] if len(self_ratings) > 10 else self_ratings}")
-    print(f"   - Тест (первые 10 значений): {test_scores[:10] if len(test_scores) > 10 else test_scores}")
-    print(f"   - Все оценки = 10? {all(r == 10 for r in self_ratings) if self_ratings else False}")
-    print(f"   - Все тесты = 100? {all(s == 100 for s in test_scores) if test_scores else False}")
-    print(f"   - Количество областей с низкими баллами: {sum(1 for r in self_ratings if r < 7) if self_ratings else 0}")
+    # ============================================================
+    # ДИАГНОСТИКА — ПОСМОТРИМ, ЧТО РЕАЛЬНО ПРИХОДИТ
+    # ============================================================
+    print(f"\n{'='*60}")
+    print(f"🔍 ДИАГНОСТИКА ПЕРЕД ОТПРАВКОЙ В GigaChat:")
+    print(f"   - user_name: {user_name}")
+    print(f"   - self_ratings (длина {len(self_ratings)}): {self_ratings}")
+    print(f"   - test_scores (длина {len(test_scores)}): {test_scores}")
+    print(f"{'='*60}\n")
     
     # Формируем промпт
     prompt = build_prompt(user_name, self_ratings, test_scores, materials)
     
-    # Сохраняем промпт в файл для отладки (опционально)
-    print(f"📝 Промпт отправлен GigaChat (первые 500 символов): {prompt[:500]}...")
+    # Сохраняем промпт в лог (первые 1000 символов)
+    print(f"📝 ПРОМПТ (первые 1000 символов):\n{prompt[:1000]}...\n")
     
     try:
         with GigaChat(
@@ -200,10 +201,12 @@ def get_gigachat_recommendations(user_name, self_ratings, test_scores, materials
             model=GIGACHAT_CREDENTIALS["model"],
             timeout=120
         ) as giga:
-            response = giga.chat(prompt)
+            response = giga.chat(prompt, max_tokens=2000)
             result = response.choices[0].message.content
-            print(f"💡 Ответ GigaChat получен (длина: {len(result)} символов)")
-            print(f"📄 Первые 300 символов ответа: {result[:300]}...")
+            
+            print(f"💡 ОТВЕТ GigaChat (длина {len(result)} символов):")
+            print(f"{result[:500]}...\n")
+            
             return result
     except Exception as e:
         print(f"❌ ОШИБКА GigaChat: {e}")
