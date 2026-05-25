@@ -178,99 +178,44 @@ def build_prompt(user_name, self_ratings, test_scores, materials):
 # РАБОТА С GigaChat
 # ============================================================
 def get_gigachat_recommendations(user_name, self_ratings, test_scores, materials):
-    """Отправляет запрос к GigaChat и возвращает рекомендации"""
+    """Минимальный тест GigaChat для диагностики"""
+    print("🚀 Тест GigaChat начат")
     
-    prompt = build_prompt(user_name, self_ratings, test_scores, materials)
+    # 1. Проверка наличия ключа
+    creds = GIGACHAT_CREDENTIALS.get("credentials")
+    if not creds:
+        print("❌ Ключ GIGACHAT_CREDENTIALS не найден в переменных окружения!")
+        return get_fallback_recommendations()
     
-    print(f"\n{'='*80}")
-    print(f"🔍 ПРОМПТ ДЛЯ GIGACHAT (первые 500 символов):")
-    print(prompt[:500])
-    print(f"{'='*80}\n")
+    print(f"✅ Ключ найден (первые 5 символов: {creds[:5]})")
     
+    # 2. Пробуем создать клиент и отправить простейший запрос
+    from gigachat import GigaChat
     try:
-        if not GIGACHAT_CREDENTIALS.get("credentials"):
-            print("❌ Нет credentials")
-            return get_fallback_recommendations()
+        print("⏳ Создаю клиент GigaChat...")
+        giga = GigaChat(
+            credentials=creds,
+            verify_ssl_certs=False,
+            timeout=30
+        )
+        print("✅ Клиент создан")
         
-        print("⏳ Подключаемся к GigaChat...")
+        print("⏳ Отправляю тестовый запрос 'Привет'...")
+        response = giga.chat("Привет! Ты работаешь?")
+        print(f"✅ Ответ получен: {response.choices[0].message.content[:50]}")
         
-        # Пробуем разные варианты
-        try:
-            # Вариант 1: без verify_ssl_certs
-            giga = GigaChat(
-                credentials=GIGACHAT_CREDENTIALS["credentials"],
-                scope=GIGACHAT_CREDENTIALS["scope"],
-                verify_ssl_certs=False,
-                model=GIGACHAT_CREDENTIALS["model"],
-                timeout=120
-            )
-        except Exception as e1:
-            print(f"❌ Ошибка подключения (вариант 1): {e1}")
-            try:
-                # Вариант 2: без timeout
-                giga = GigaChat(
-                    credentials=GIGACHAT_CREDENTIALS["credentials"],
-                    scope=GIGACHAT_CREDENTIALS["scope"],
-                    verify_ssl_certs=False,
-                    model=GIGACHAT_CREDENTIALS["model"]
-                )
-            except Exception as e2:
-                print(f"❌ Ошибка подключения (вариант 2): {e2}")
-                raise
-        
-        print("⏳ Отправляем prompt в GigaChat...")
+        # Если дошло сюда, то всё работает!
+        # Формируем полноценный ответ на основе данных пользователя
+        prompt = build_prompt(user_name, self_ratings, test_scores, materials)
+        print("⏳ Отправляю полноценный запрос...")
         response = giga.chat(prompt)
-        
-        print("⏳ Получаем ответ...")
         result = response.choices[0].message.content
-        
-        print(f"✅ Ответ получен, длина: {len(result)} символов")
+        print(f"✅ Получен ответ (длина: {len(result)} символов)")
         return result
         
     except Exception as e:
-        error_msg = f"Ошибка GigaChat: {type(e).__name__}: {e}"
-        print(f"\n❌ {error_msg}")
-        
-        # Отправляем письмо с подробной ошибкой
-        try:
-            import requests
-            resend_api_key = os.environ.get("RESEND_API_KEY")
-            if resend_api_key:
-                details = f"""
-🔴 ОШИБКА GigaChat
-
-Тип: {type(e).__name__}
-Текст: {e}
-
-Данные пользователя:
-- Имя: {user_name}
-- Самооценка: {self_ratings}
-- Тест: {test_scores}
-
-Проверь:
-1. Client Secret в переменной GIGACHAT_CREDENTIALS
-2. Доступность API GigaChat
-3. Правильность scope и model
-"""
-                requests.post(
-                    "https://api.resend.com/emails",
-                    headers={"Authorization": f"Bearer {resend_api_key}", "Content-Type": "application/json"},
-                    json={
-                        "from": "noreply@resend.dev",
-                        "to": "kokorinmo@gmail.com",
-                        "subject": "🔴 ОШИБКА GigaChat - требуется проверка",
-                        "html": details.replace("\n", "<br>")
-                    },
-                    timeout=10
-                )
-                print("📧 Письмо с деталями ошибки отправлено")
-        except Exception as email_err:
-            print(f"❌ Не удалось отправить письмо об ошибке: {email_err}")
-        
+        print(f"❌ Ошибка при работе с GigaChat: {type(e).__name__}: {e}")
         return get_fallback_recommendations()
-
-@app.route('/recommend', methods=['POST'])
-
 def get_fallback_recommendations():
     """Рекомендации на случай, если GigaChat недоступен, и уведомление об ошибке"""
     
