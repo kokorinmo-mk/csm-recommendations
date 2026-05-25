@@ -73,9 +73,9 @@ def save_recommendations_to_sheets(user_name, user_email, recommendations):
 # ФОРМИРОВАНИЕ ПРОМПТА С МАТЕРИАЛАМИ
 # ============================================================
 def build_prompt(user_name, self_ratings, test_scores, materials):
-    """Формирует промпт для GigaChat — только рекомендации, без лишних блоков"""
+    """Формирует промпт — GigaChat сам выбирает области"""
     
-    # Форматируем материалы
+    # Форматируем материалы (все области, все курсы)
     materials_text = ""
     for area, items in materials.items():
         materials_text += f"\n### {area}\n"
@@ -86,57 +86,37 @@ def build_prompt(user_name, self_ratings, test_scores, materials):
         if courses:
             materials_text += "**[Курсы]**\n"
             for c in courses[:3]:
-                materials_text += f"• {c['name']} — {c['url']}\n"
+                materials_text += f"• [{c['name']}]({c['url']})\n"
         if articles:
             materials_text += "**[Статьи]**\n"
             for a in articles[:3]:
-                materials_text += f"• {a['name']} — {a['url']}\n"
+                materials_text += f"• [{a['name']}]({a['url']})\n"
         if videos:
             materials_text += "**[Видео]**\n"
             for v in videos[:3]:
-                materials_text += f"• {v['name']} — {v['url']}\n"
+                materials_text += f"• [{v['name']}]({v['url']})\n"
     
-    # Создаём список областей с баллами
-    area_scores = []
-    for i, (area, items) in enumerate(materials.items()):
-        if i < len(self_ratings) and i < len(test_scores):
-            self_score = self_ratings[i]
-            test_score = test_scores[i]
-            problem_score = (10 - self_score) + (100 - test_score)
-            area_scores.append({
-                'name': area,
-                'self': self_score,
-                'test': test_score,
-                'problem_score': problem_score
-            })
-    
-    # Сортируем и берём ТОП-3
-    area_scores.sort(key=lambda x: x['problem_score'], reverse=True)
-    top_areas = area_scores[:3]
-    
-    # Формируем список областей
-    top_areas_text = ""
-    for a in top_areas:
-        top_areas_text += f"- {a['name']}: самооценка {a['self']}/10, тест {a['test']}%\n"
-    
-    # ПРОМПТ - ТОЛЬКО РЕКОМЕНДАЦИИ
-    prompt = """
+    # Промпт — GigaChat сам анализирует и выбирает
+    prompt = f"""
 Ты — эксперт по компетенциям CSM 2.0.
 
 Данные пользователя:
-- ФИО: ИМЯ_ПОЛЬЗОВАТЕЛЯ
+- ФИО: {user_name}
 
-### ВАЖНО: У пользователя САМЫЕ НИЗКИЕ результаты в следующих областях (их нужно анализировать):
+Результаты самооценки (оценки от 1 до 10):
+{self_ratings}
 
-СПИСОК_ОБЛАСТЕЙ
+Результаты теста (проценты правильных ответов):
+{test_scores}
 
 ### Доступные материалы (бери ссылки ТОЛЬКО отсюда):
-МАТЕРИАЛЫ
+{materials_text}
 
 ### Твоя задача:
-1. НЕ ПИШИ ПОЗДРАВЛЕНИЕ.
-2. Проанализируй ТОЛЬКО указанные выше 3 области.
-3. Для КАЖДОЙ области напиши в точном формате:
+1. НЕ ПИШИ ПОЗДРАВЛЕНИЕ. Пользователь НЕ достиг максимальных результатов.
+2. Проанализируй результаты. Найди области, где самооценка < 7 ИЛИ тест < 75%.
+3. Выбери ТОП-3 области с САМЫМИ НИЗКИМИ результатами.
+4. Для каждой области напиши в формате:
 
 #### НАЗВАНИЕ_ОБЛАСТИ
 
@@ -153,16 +133,13 @@ def build_prompt(user_name, self_ratings, test_scores, materials):
 **[Видео]**
 • [Название видео](ссылка)
 
+5. НЕ ДОБАВЛЯЙ никаких советов, заключений или блоков "что делать дальше".
+
 ### Важно:
 - Используй ТОЛЬКО ссылки из списка материалов
-- НЕ ДОБАВЛЯЙ никаких советов, заключений или блоков "что делать дальше"
+- НЕ ПИШИ "Поздравляем"
 - Ответ ТОЛЬКО на русском языке
 """
-    # Заменяем плейсхолдеры
-    prompt = prompt.replace("ИМЯ_ПОЛЬЗОВАТЕЛЯ", user_name)
-    prompt = prompt.replace("СПИСОК_ОБЛАСТЕЙ", top_areas_text)
-    prompt = prompt.replace("МАТЕРИАЛЫ", materials_text)
-    
     return prompt
 
 # ============================================================
