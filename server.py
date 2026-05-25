@@ -192,7 +192,7 @@ def get_gigachat_recommendations(user_name, self_ratings, test_scores, materials
             model=GIGACHAT_CREDENTIALS["model"],
             timeout=120
         ) as giga:
-            response = giga.chat(prompt, max_tokens=1500)
+            response = giga.chat(prompt)
             result = response.choices[0].message.content
             print(f"💡 Ответ GigaChat получен (длина: {len(result)} символов)")
             print(f"📄 Первые 300 символов ответа: {result[:300]}...")
