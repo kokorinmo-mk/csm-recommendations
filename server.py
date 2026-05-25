@@ -172,7 +172,22 @@ def build_prompt(user_name, self_ratings, test_scores, materials):
 # РАБОТА С GigaChat
 # ============================================================
 def get_gigachat_recommendations(user_name, self_ratings, test_scores, materials):
+    """Отправляет запрос к GigaChat и возвращает рекомендации"""
+    
+    # Диагностика - выводим полученные данные
+    print(f"🔍 ДИАГНОСТИКА:")
+    print(f"   - Имя пользователя: {user_name}")
+    print(f"   - Самооценка (первые 10 значений): {self_ratings[:10] if len(self_ratings) > 10 else self_ratings}")
+    print(f"   - Тест (первые 10 значений): {test_scores[:10] if len(test_scores) > 10 else test_scores}")
+    print(f"   - Все оценки = 10? {all(r == 10 for r in self_ratings) if self_ratings else False}")
+    print(f"   - Все тесты = 100? {all(s == 100 for s in test_scores) if test_scores else False}")
+    print(f"   - Количество областей с низкими баллами: {sum(1 for r in self_ratings if r < 7) if self_ratings else 0}")
+    
+    # Формируем промпт
     prompt = build_prompt(user_name, self_ratings, test_scores, materials)
+    
+    # Сохраняем промпт в файл для отладки (опционально)
+    print(f"📝 Промпт отправлен GigaChat (первые 500 символов): {prompt[:500]}...")
     
     try:
         with GigaChat(
@@ -183,9 +198,12 @@ def get_gigachat_recommendations(user_name, self_ratings, test_scores, materials
             timeout=120
         ) as giga:
             response = giga.chat(prompt)
-            return response.choices[0].message.content
+            result = response.choices[0].message.content
+            print(f"💡 Ответ GigaChat получен (длина: {len(result)} символов)")
+            print(f"📄 Первые 300 символов ответа: {result[:300]}...")
+            return result
     except Exception as e:
-        print(f"❌ Ошибка GigaChat: {e}")
+        print(f"❌ ОШИБКА GigaChat: {e}")
         return get_fallback_recommendations()
 
 def get_fallback_recommendations():
