@@ -179,23 +179,23 @@ def build_prompt(user_name, self_ratings, test_scores, materials):
 def get_gigachat_recommendations(user_name, self_ratings, test_scores, materials):
     """Отправляет запрос к GigaChat и возвращает рекомендации"""
     
-    # ============================================================
-    # ДИАГНОСТИКА — ПОСМОТРИМ, ЧТО РЕАЛЬНО ПРИХОДИТ
-    # ============================================================
-    print(f"\n{'='*60}")
-    print(f"🔍 ДИАГНОСТИКА ПЕРЕД ОТПРАВКОЙ В GigaChat:")
-    print(f"   - user_name: {user_name}")
-    print(f"   - self_ratings (длина {len(self_ratings)}): {self_ratings}")
-    print(f"   - test_scores (длина {len(test_scores)}): {test_scores}")
-    print(f"{'='*60}\n")
-    
-    # Формируем промпт
     prompt = build_prompt(user_name, self_ratings, test_scores, materials)
     
-    # Сохраняем промпт в лог (первые 1000 символов)
-    print(f"📝 ПРОМПТ (первые 1000 символов):\n{prompt[:1000]}...\n")
+    print(f"\n{'='*80}")
+    print(f"🔍 ПРОМПТ ДЛЯ GIGACHAT (полностью):")
+    print(f"{'='*80}")
+    print(prompt)
+    print(f"{'='*80}\n")
     
     try:
+        # Проверка наличия credentials
+        if not GIGACHAT_CREDENTIALS.get("credentials"):
+            print("❌ ОШИБКА: GIGACHAT_CREDENTIALS не найдены в переменных окружения")
+            return get_fallback_recommendations()
+        
+        print(f"🔑 Используем credentials: {GIGACHAT_CREDENTIALS['credentials'][:20]}...")
+        print(f"⏳ Отправляем запрос к GigaChat...")
+        
         with GigaChat(
             credentials=GIGACHAT_CREDENTIALS["credentials"],
             scope=GIGACHAT_CREDENTIALS["scope"],
@@ -206,25 +206,22 @@ def get_gigachat_recommendations(user_name, self_ratings, test_scores, materials
             response = giga.chat(prompt, max_tokens=2000)
             result = response.choices[0].message.content
             
-            print(f"💡 ОТВЕТ GigaChat (длина {len(result)} символов):")
-            print(f"{result[:500]}...\n")
+            print(f"\n{'='*80}")
+            print(f"✅ ОТВЕТ GIGACHAT (успешно получен):")
+            print(f"{'='*80}")
+            print(result)
+            print(f"{'='*80}\n")
             
             return result
+            
     except Exception as e:
-        print(f"❌ ОШИБКА GigaChat: {e}")
+        print(f"\n{'='*80}")
+        print(f"❌ ОШИБКА GIGACHAT:")
+        print(f"   Тип ошибки: {type(e).__name__}")
+        print(f"   Текст: {e}")
+        print(f"{'='*80}\n")
         return get_fallback_recommendations()
-
-def get_fallback_recommendations():
-    return """
-1. Область 1. Осознание (Изучите тренды AI, Big Data, Cloud. Рекомендуем курс «Введение в искусственный интеллект»)
-2. Область 2. Стратегия (Изучите Business Model Canvas. Курс «Стратегия Сбера»)
-3. Область 6. Общесистемные компетенции (Освойте GigaChat. Курс «Работа с LLM GigaChat»)
-"""
-
-# ============================================================
-# ЭНДПОИНТЫ
-# ============================================================
-@app.route('/', methods=['GET'])
+        
 def index():
     return jsonify({"status": "OK", "message": "Сервер CSM 2.0 работает!"})
 
