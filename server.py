@@ -239,28 +239,29 @@ def recommend():
         user_name = data.get('userName')
         user_email = data.get('userEmail')
         
-        # Получаем данные в твоём формате (объекты с названиями областей)
-        self_ratings_dict = data.get('selfRatings', {})
-        test_scores_dict = data.get('testScores', {})
+        self_ratings_data = data.get('selfRatings', [])
+        test_scores_data = data.get('testScores', [])
         
-        print(f"📊 Самооценка (%): {self_ratings_dict}")
-        print(f"📊 Тест (%): {test_scores_dict}")
-        
-        # Список областей в правильном порядке
-        area_names = [
-            "Осознание",
-            "Стратегия",
-            "Реинжиниринг процессов и оргструктуры",
-            "Проектирование и разработка решения",
-            "Внедрение и развитие решения",
-            "Общесистемные компетенции и методология проектов развития",
-            "Отраслевые компетенции",
-            "Soft skills"
-        ]
-        
-        # Превращаем объекты в списки для удобства
-        self_ratings = [self_ratings_dict.get(name, 0) for name in area_names]
-        test_scores = [test_scores_dict.get(name, 0) for name in area_names]
+        # Определяем формат: если пришёл список — используем как есть
+        if isinstance(self_ratings_data, list):
+            self_ratings = self_ratings_data
+            test_scores = test_scores_data
+            print("📊 Формат: список (старый)")
+        else:
+            # Если пришёл объект с названиями — преобразуем в список
+            area_names = [
+                "Осознание",
+                "Стратегия",
+                "Реинжиниринг процессов и оргструктуры",
+                "Проектирование и разработка решения",
+                "Внедрение и развитие решения",
+                "Общесистемные компетенции и методология проектов развития",
+                "Отраслевые компетенции",
+                "Soft skills"
+            ]
+            self_ratings = [self_ratings_data.get(name, 0) for name in area_names]
+            test_scores = [test_scores_data.get(name, 0) for name in area_names]
+            print("📊 Формат: объект с названиями (новый)")
         
         print(f"📊 Самооценка (список): {self_ratings}")
         print(f"📊 Тест (список): {test_scores}")
