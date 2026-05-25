@@ -1,4 +1,3 @@
-@@ -1,284 +1,270 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
@@ -23,19 +22,16 @@ GIGACHAT_CREDENTIALS = {
     "model": "GigaChat"
 }
 
-# URL для получения материалов из Google Sheets (твой новый скрипт)
+# ⚠️ ЗДЕСЬ ТВОИ URL (ОНИ УЖЕ ПРАВИЛЬНЫЕ)
 MATERIALS_URL = "https://script.google.com/macros/s/AKfycbzOlrBj4ZY5iqStx3gUiF3Duecu0W8X26BfFsvNWJ6CoRLU7Hf2B7jDHnLVX4qE9m9w/exec"
-
-# URL для сохранения рекомендаций в Google Sheets
 SAVE_TO_SHEETS_URL = "https://script.google.com/macros/s/AKfycbw23tamPZcP3VTYP6nHIJacjGChp6XryrRXGPY_ogU3ww1n5AiEqa2G0V5P0SNZO4KGkw/exec"
 
 # ============================================================
-# ЗАГРУЗКА МАТЕРИАЛОВ ИЗ GOOGLE SHEETS
+# ЗАГРУЗКА МАТЕРИАЛОВ
 # ============================================================
 def load_materials_from_sheets():
-    """Загружает курсы из листа 'Материалы для рекомендаций'"""
     try:
-        response = requests.get(MATERIALS_URL)
+        response = requests.get(MATERIALS_URL, timeout=30)
         if response.status_code == 200:
             materials = response.json()
             print(f"✅ Загружено {len(materials)} материалов")
@@ -48,10 +44,9 @@ def load_materials_from_sheets():
         return {}
 
 # ============================================================
-# СОХРАНЕНИЕ РЕКОМЕНДАЦИЙ В GOOGLE SHEETS
+# СОХРАНЕНИЕ РЕКОМЕНДАЦИЙ
 # ============================================================
 def save_recommendations_to_sheets(user_name, user_email, recommendations):
-    """Сохраняет рекомендации в Google Sheets"""
     try:
         payload = {
             "userName": user_name,
@@ -59,7 +54,7 @@ def save_recommendations_to_sheets(user_name, user_email, recommendations):
             "recommendations": recommendations,
             "timestamp": datetime.now().isoformat()
         }
-        response = requests.post(SAVE_TO_SHEETS_URL, json=payload)
+        response = requests.post(SAVE_TO_SHEETS_URL, json=payload, timeout=30)
         if response.status_code == 200:
             print(f"✅ Рекомендации сохранены в Sheets")
             return True
@@ -71,16 +66,9 @@ def save_recommendations_to_sheets(user_name, user_email, recommendations):
         return False
 
 # ============================================================
-# ФОРМИРОВАНИЕ ПРОМПТА С МАТЕРИАЛАМИ
+# ФОРМИРОВАНИЕ ПРОМПТА
 # ============================================================
 def build_prompt(user_name, self_ratings, test_scores, materials):
-    """Промпт с правилами 1-10 — НЕ МЕНЯТЬ БЕЗ СОГЛАСОВАНИЯ"""
-
-    # self_ratings и test_scores — это уже списки из 8 элементов
-    # self_ratings[0] — средняя самооценка по Осознанию
-    # test_scores[0] — процент теста по Осознанию
-    
-    # self_ratings и test_scores — списки из 8 элементов
     area_names = [
         "Осознание",
         "Стратегия",
@@ -92,14 +80,12 @@ def build_prompt(user_name, self_ratings, test_scores, materials):
         "Soft skills"
     ]
 
-    # Формируем строку с данными
     data_text = ""
     for i, name in enumerate(area_names):
         self_val = self_ratings[i] if i < len(self_ratings) else 0
         test_val = test_scores[i] if i < len(test_scores) else 0
         data_text += f"{i+1}. {name} — самооценка: {self_val}/10, тест: {test_val}%\n"
 
-    # Форматируем материалы
     materials_text = ""
     for area, items in materials.items():
         materials_text += f"\n### {area}\n"
@@ -120,7 +106,6 @@ def build_prompt(user_name, self_ratings, test_scores, materials):
             for v in videos:
                 materials_text += f"• [{v['name']}]({v['url']})\n"
 
-    # Промпт
     prompt = f"""
 Ты — эксперт по компетенциям CSM 2.0.
 
@@ -133,12 +118,10 @@ def build_prompt(user_name, self_ratings, test_scores, materials):
 ### Доступные материалы:
 {materials_text}
 
-### ПРАВИЛА (ВЫПОЛНИ СТРОГО, НЕ НАРУШАЙ):
-### Твоя задача — выполнить правила (ничего не меняй, не добавляй от себя):
+### ПРАВИЛА (ВЫПОЛНИ СТРОГО):
 
 **ПРАВИЛО 1:**
-Если тест по ВСЕМ областям = 100% И самооценка по ВСЕМ областям = 10, то напиши ТОЛЬКО это (без ссылок):
-Если тест по ВСЕМ 8 областям = 100% И самооценка по ВСЕМ 8 областям = 10, то напиши ТОЛЬКО это:
+Если тест по ВСЕМ 8 областям = 100% И самооценка по ВСЕМ 8 областям = 10, то напиши:
 🎉 Поздравляем, {user_name}! Вы показали максимальные результаты по всем компетенциям CSM 2.0.
 Вы находитесь на экспертном уровне. Рекомендуем:
 • Выступать в роли наставника для коллег
@@ -147,59 +130,36 @@ def build_prompt(user_name, self_ratings, test_scores, materials):
 Если вы хотите развиваться дальше, обратитесь к руководителю — вместе вы сможете сформировать индивидуальный план развития (ИПР).
 
 **ПРАВИЛО 2:**
-Если самооценка по ВСЕМ областям = 10, НО есть ошибки в тесте (<100%), то выведи рекомендации ТОЛЬКО по областям, где тест <100%. Выбери не больше 3 областей с САМЫМИ НИЗКИМИ процентами теста.
 Если самооценка по ВСЕМ 8 областям = 10, НО есть ошибки в тесте (<100%), то выведи рекомендации ТОЛЬКО по областям, где тест <100%. Выбери не больше 3 областей с САМЫМИ НИЗКИМИ процентами теста.
 
 **ПРАВИЛО 3:**
-Если тест по ВСЕМ областям = 100%, НО самооценка <10 хотя бы в одной области, то выведи сообщение: "Несмотря на то, что тест пройден на 100%, обратите внимание на области, где вы оценили себя ниже 10 баллов." Затем выведи рекомендации ТОЛЬКО по областям, где самооценка <7. Выбери не больше 3 областей с САМЫМИ НИЗКИМИ баллами самооценки.
 Если тест по ВСЕМ 8 областям = 100%, НО самооценка <10 хотя бы в одной области, то сначала напиши: "Несмотря на то, что тест пройден на 100%, обратите внимание на области, где вы оценили себя ниже 10 баллов." Затем выведи рекомендации ТОЛЬКО по областям, где самооценка <7. Выбери не больше 3 областей с САМЫМИ НИЗКИМИ баллами самооценки.
 
 **ПРАВИЛО 4:**
-Если пользователь ошибся в тесте во ВСЕХ областях (<100% везде), выведи ТОП-3 области с САМЫМИ НИЗКИМИ процентами теста (самооценку не учитывай).
 Если пользователь ошибся в тесте во ВСЕХ 8 областях (<100% везде), выведи ТОП-3 области с САМЫМИ НИЗКИМИ процентами теста (самооценку не учитывай).
 
 **ПРАВИЛО 5:**
-Если тест = 100% по всем областям, а самооценка = 10 по всем областям — используй ПРАВИЛО 1.
-
-**ПРАВИЛО 6:**
-Если ошибки в тесте есть, но не во всех областях, выбери области где тест <75% ИЛИ самооценка <7. Выбери ТОП-3 с САМЫМИ НИЗКИМИ процентами теста (при равных процентах — учитывай самооценку).
 Если ошибки в тесте есть, но не во всех областях, выбери области где тест <75% ИЛИ самооценка <7. Выбери ТОП-3 с САМЫМИ НИЗКИМИ процентами теста. Если проценты одинаковые — учитывай самооценку (чем ниже, тем приоритетнее).
 
-**ПРАВИЛО 7:**
+**ПРАВИЛО 6:**
 Формат для каждой рекомендации:
-**ФОРМАТ для каждой рекомендации:**
 #### **Название области**
 📊 Результаты: самооценка — X/10, тест — Y%
 📚 Рекомендую изучить:
 **[Курсы]**
-• [Название](ссылка)
 • [Название курса](ссылка)
 **[Статьи]**
-• [Название](ссылка)
 • [Название статьи](ссылка)
 **[Видео]**
-• [Название](ссылка)
-
-**ПРАВИЛО 8:**
-ВЫБИРАЙ ТОЛЬКО 3 ОБЛАСТИ. НЕ 4, НЕ 2, А 3. ЕСЛИ ПОДХОДЯТ БОЛЬШЕ 3 — ВОЗЬМИ 3 С САМЫМИ НИЗКИМИ ПРОЦЕНТАМИ ТЕСТА.
-
-**ПРАВИЛО 9:**
-ДЛЯ КАЖДОЙ ВЫБРАННОЙ ОБЛАСТИ ОБЯЗАТЕЛЬНО ДОБАВЛЯЙ СТАТЬИ И ВИДЕО ИЗ СПИСКА МАТЕРИАЛОВ. ЕСЛИ ИХ НЕТ — НАПИШИ "— НЕТ В НАЛИЧИИ".
-
-**ПРАВИЛО 10:**
-НАЗВАНИЕ КАЖДОЙ ОБЛАСТИ В РЕКОМЕНДАЦИИ ВЫДЕЛЯЙ ЖИРНЫМ: **Название области**
 • [Название видео](ссылка)
 
+**ПРАВИЛО 7:**
+ВЫБИРАЙ ТОЛЬКО 3 ОБЛАСТИ. НЕ БОЛЬШЕ.
+ДЛЯ КАЖДОЙ ОБЛАСТИ ОБЯЗАТЕЛЬНО ДОБАВЛЯЙ СТАТЬИ И ВИДЕО. ЕСЛИ ИХ НЕТ — НАПИШИ "— НЕТ В НАЛИЧИИ".
+НАЗВАНИЕ ОБЛАСТИ ВЫДЕЛЯЙ ЖИРНЫМ.
+
 ### ВАЖНО:
-- Названия областей пиши в точности как в списке выше
-- Не добавляй никаких советов, заключений или блоков "что делать дальше"
-- Не пиши области, которые не подходят под правила
-**ДОПОЛНИТЕЛЬНЫЕ ПРАВИЛА:**
-- ВЫБИРАЙ ТОЛЬКО 3 ОБЛАСТИ. НЕ БОЛЬШЕ.
-- ДЛЯ КАЖДОЙ ОБЛАСТИ ОБЯЗАТЕЛЬНО ДОБАВЛЯЙ СТАТЬИ И ВИДЕО. ЕСЛИ ИХ НЕТ — НАПИШИ "— НЕТ В НАЛИЧИИ".
-- НАЗВАНИЕ ОБЛАСТИ ВЫДЕЛЯЙ ЖИРНЫМ: **Название области**
-- НЕ ПИШИ области, которые не подходят под правила
-- НЕ ДОБАВЛЯЙ советы, заключения или "что делать дальше"
+- Не добавляй никаких советов, заключений или "что делать дальше"
 - Используй ТОЛЬКО ссылки из списка материалов
 - Ответ только на русском языке
 """
@@ -209,24 +169,10 @@ def build_prompt(user_name, self_ratings, test_scores, materials):
 # РАБОТА С GigaChat
 # ============================================================
 def get_gigachat_recommendations(user_name, self_ratings, test_scores, materials):
-    """Отправляет запрос к GigaChat и возвращает рекомендации"""
-
-    # ============================================================
-    # ДИАГНОСТИКА — ПОСМОТРИМ, ЧТО РЕАЛЬНО ПРИХОДИТ
-    # ============================================================
-    print(f"\n{'='*60}")
-    print(f"🔍 ДИАГНОСТИКА ПЕРЕД ОТПРАВКОЙ В GigaChat:")
-    print(f"   - user_name: {user_name}")
-    print(f"   - self_ratings (длина {len(self_ratings)}): {self_ratings}")
-    print(f"   - test_scores (длина {len(test_scores)}): {test_scores}")
-    print(f"{'='*60}\n")
-
-    # Формируем промпт
+    print(f"\n📊 Данные: самооценка={self_ratings}, тест={test_scores}")
+    
     prompt = build_prompt(user_name, self_ratings, test_scores, materials)
-
-    # Сохраняем промпт в лог (первые 1000 символов)
-    print(f"📝 ПРОМПТ (первые 1000 символов):\n{prompt[:1000]}...\n")
-
+    
     try:
         with GigaChat(
             credentials=GIGACHAT_CREDENTIALS["credentials"],
@@ -235,22 +181,25 @@ def get_gigachat_recommendations(user_name, self_ratings, test_scores, materials
             model=GIGACHAT_CREDENTIALS["model"],
             timeout=120
         ) as giga:
-            response = giga.chat(prompt, max_tokens=2000)
+            response = giga.chat(prompt)
             result = response.choices[0].message.content
-
-            print(f"💡 ОТВЕТ GigaChat (длина {len(result)} символов):")
-            print(f"{result[:500]}...\n")
-
+            print(f"✅ Ответ получен")
             return result
     except Exception as e:
-        print(f"❌ ОШИБКА GigaChat: {e}")
+        print(f"❌ Ошибка GigaChat: {e}")
         return get_fallback_recommendations()
 
 def get_fallback_recommendations():
     return """
-1. Область 1. Осознание (Изучите тренды AI, Big Data, Cloud. Рекомендуем курс «Введение в искусственный интеллект»)
-2. Область 2. Стратегия (Изучите Business Model Canvas. Курс «Стратегия Сбера»)
-3. Область 6. Общесистемные компетенции (Освойте GigaChat. Курс «Работа с LLM GigaChat»)
+#### **Осознание**
+📊 Результаты: самооценка — 7/10, тест — 50%
+📚 Рекомендую изучить:
+**[Курсы]**
+• [Курс «ESG: выбирая будущее»](https://hr.sberbank.ru/...)
+**[Статьи]**
+• [Статья «Стратегия 2026»](https://hr.sberbank.ru/...)
+**[Видео]**
+• [Видео «ПСС: Ориентация на клиента»](https://hr.sberbank.ru/...)
 """
 
 # ============================================================
@@ -269,30 +218,22 @@ def recommend():
     try:
         data = request.get_json()
         print(f"📨 Получен запрос от: {data.get('userName')}")
-
+        
         user_name = data.get('userName')
         user_email = data.get('userEmail')
         self_ratings = data.get('selfRatings', [])
         test_scores = data.get('testScores', [])
-
-        # Загружаем материалы из Google Sheets
+        
         materials = load_materials_from_sheets()
-
-        # Получаем рекомендации от GigaChat
         recommendations = get_gigachat_recommendations(user_name, self_ratings, test_scores, materials)
-        print(f"💡 Рекомендации получены от GigaChat")
-
-        # Сохраняем в Google Sheets
+        
         saved = save_recommendations_to_sheets(user_name, user_email, recommendations)
-
+        
         if saved:
-            return jsonify({
-                "success": True,
-                "message": "Рекомендации сохранены. Письмо будет отправлено автоматически."
-            })
+            return jsonify({"success": True, "message": "Рекомендации сохранены"})
         else:
             return jsonify({"success": False, "message": "Ошибка сохранения"}), 500
-
+        
     except Exception as e:
         print(f"❌ Ошибка: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
