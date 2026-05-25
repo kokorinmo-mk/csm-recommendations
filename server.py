@@ -73,9 +73,53 @@ def save_recommendations_to_sheets(user_name, user_email, recommendations):
 # ФОРМИРОВАНИЕ ПРОМПТА С МАТЕРИАЛАМИ
 # ============================================================
 def build_prompt(user_name, self_ratings, test_scores, materials):
-    """Промпт с правилами 1-10 — ничего не менять без согласования"""
+    """Промпт с правилами 1-10 — НЕ МЕНЯТЬ БЕЗ СОГЛАСОВАНИЯ"""
     
-    # Форматируем материалы для каждой области
+    # ============================================================
+    # ВЫЧИСЛЯЕМ СРЕДНИЕ БАЛЛЫ ПО ОБЛАСТЯМ
+    # ============================================================
+    # Названия областей (строго 8 штук)
+    area_names = [
+        "Осознание",
+        "Стратегия",
+        "Реинжиниринг процессов и оргструктуры",
+        "Проектирование и разработка решения",
+        "Внедрение и развитие решения",
+        "Общесистемные компетенции и методология проектов развития",
+        "Отраслевые компетенции",
+        "Soft skills"
+    ]
+    
+    # Количество вопросов в каждой области (4, 6, 7, 4, 2, 4, 3, 3)
+    questions_per_area = [4, 6, 7, 4, 2, 4, 3, 3]
+    
+    # Вычисляем средние для самооценки
+    self_avg = []
+    idx = 0
+    for q_count in questions_per_area:
+        if idx + q_count <= len(self_ratings):
+            area_ratings = self_ratings[idx:idx + q_count]
+            avg = round(sum(area_ratings) / q_count, 1)
+            self_avg.append(avg)
+        else:
+            self_avg.append(0)
+        idx += q_count
+    
+    # Вычисляем средние для теста
+    test_avg = []
+    idx = 0
+    for q_count in questions_per_area:
+        if idx + q_count <= len(test_scores):
+            area_scores = test_scores[idx:idx + q_count]
+            avg = round(sum(area_scores) / q_count, 1)
+            test_avg.append(avg)
+        else:
+            test_avg.append(0)
+        idx += q_count
+    
+    # ============================================================
+    # ФОРМАТИРУЕМ МАТЕРИАЛЫ
+    # ============================================================
     materials_text = ""
     for area, items in materials.items():
         materials_text += f"\n### {area}\n"
@@ -96,22 +140,24 @@ def build_prompt(user_name, self_ratings, test_scores, materials):
             for v in videos:
                 materials_text += f"• [{v['name']}]({v['url']})\n"
     
-    # Формируем промпт со ВСЕМИ правилами
+    # ============================================================
+    # ФОРМИРУЕМ ПРОМПТ С УСРЕДНЁННЫМИ ДАННЫМИ
+    # ============================================================
     prompt = f"""
 Ты — эксперт по компетенциям CSM 2.0.
 
 Пользователь: {user_name}
 
-Ниже данные по 8 областям:
+### Данные по 8 областям (средние значения):
 
-1. Осознание — самооценка: {self_ratings[0] if len(self_ratings) > 0 else 'нет'} / 10, тест: {test_scores[0] if len(test_scores) > 0 else 'нет'}%
-2. Стратегия — самооценка: {self_ratings[1] if len(self_ratings) > 1 else 'нет'} / 10, тест: {test_scores[1] if len(test_scores) > 1 else 'нет'}%
-3. Реинжиниринг процессов и оргструктуры — самооценка: {self_ratings[2] if len(self_ratings) > 2 else 'нет'} / 10, тест: {test_scores[2] if len(test_scores) > 2 else 'нет'}%
-4. Проектирование и разработка решения — самооценка: {self_ratings[3] if len(self_ratings) > 3 else 'нет'} / 10, тест: {test_scores[3] if len(test_scores) > 3 else 'нет'}%
-5. Внедрение и развитие решения — самооценка: {self_ratings[4] if len(self_ratings) > 4 else 'нет'} / 10, тест: {test_scores[4] if len(test_scores) > 4 else 'нет'}%
-6. Общесистемные компетенции и методология проектов развития — самооценка: {self_ratings[5] if len(self_ratings) > 5 else 'нет'} / 10, тест: {test_scores[5] if len(test_scores) > 5 else 'нет'}%
-7. Отраслевые компетенции — самооценка: {self_ratings[6] if len(self_ratings) > 6 else 'нет'} / 10, тест: {test_scores[6] if len(test_scores) > 6 else 'нет'}%
-8. Soft skills — самооценка: {self_ratings[7] if len(self_ratings) > 7 else 'нет'} / 10, тест: {test_scores[7] if len(test_scores) > 7 else 'нет'}%
+1. Осознание — самооценка: {self_avg[0]}/10, тест: {test_avg[0]}%
+2. Стратегия — самооценка: {self_avg[1]}/10, тест: {test_avg[1]}%
+3. Реинжиниринг процессов и оргструктуры — самооценка: {self_avg[2]}/10, тест: {test_avg[2]}%
+4. Проектирование и разработка решения — самооценка: {self_avg[3]}/10, тест: {test_avg[3]}%
+5. Внедрение и развитие решения — самооценка: {self_avg[4]}/10, тест: {test_avg[4]}%
+6. Общесистемные компетенции и методология проектов развития — самооценка: {self_avg[5]}/10, тест: {test_avg[5]}%
+7. Отраслевые компетенции — самооценка: {self_avg[6]}/10, тест: {test_avg[6]}%
+8. Soft skills — самооценка: {self_avg[7]}/10, тест: {test_avg[7]}%
 
 ### Доступные материалы:
 {materials_text}
