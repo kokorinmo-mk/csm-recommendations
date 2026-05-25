@@ -75,10 +75,10 @@ def save_recommendations_to_sheets(user_name, user_email, recommendations):
 def build_prompt(user_name, self_ratings, test_scores, materials):
     """Промпт с правилами 1-10 — НЕ МЕНЯТЬ БЕЗ СОГЛАСОВАНИЯ"""
     
-    # ============================================================
-    # ВЫЧИСЛЯЕМ СРЕДНИЕ БАЛЛЫ ПО ОБЛАСТЯМ
-    # ============================================================
-    # Названия областей (строго 8 штук)
+    # self_ratings и test_scores — это уже списки из 8 элементов
+    # self_ratings[0] — средняя самооценка по Осознанию
+    # test_scores[0] — процент теста по Осознанию
+    
     area_names = [
         "Осознание",
         "Стратегия",
@@ -90,36 +90,14 @@ def build_prompt(user_name, self_ratings, test_scores, materials):
         "Soft skills"
     ]
     
-    # Количество вопросов в каждой области (4, 6, 7, 4, 2, 4, 3, 3)
-    questions_per_area = [4, 6, 7, 4, 2, 4, 3, 3]
+    # Формируем строку с данными
+    data_text = ""
+    for i, name in enumerate(area_names):
+        self_val = self_ratings[i] if i < len(self_ratings) else 0
+        test_val = test_scores[i] if i < len(test_scores) else 0
+        data_text += f"{i+1}. {name} — самооценка: {self_val}/10, тест: {test_val}%\n"
     
-    # Вычисляем средние для самооценки
-    self_avg = []
-    idx = 0
-    for q_count in questions_per_area:
-        if idx + q_count <= len(self_ratings):
-            area_ratings = self_ratings[idx:idx + q_count]
-            avg = round(sum(area_ratings) / q_count, 1)
-            self_avg.append(avg)
-        else:
-            self_avg.append(0)
-        idx += q_count
-    
-    # Вычисляем средние для теста
-    test_avg = []
-    idx = 0
-    for q_count in questions_per_area:
-        if idx + q_count <= len(test_scores):
-            area_scores = test_scores[idx:idx + q_count]
-            avg = round(sum(area_scores) / q_count, 1)
-            test_avg.append(avg)
-        else:
-            test_avg.append(0)
-        idx += q_count
-    
-    # ============================================================
-    # ФОРМАТИРУЕМ МАТЕРИАЛЫ
-    # ============================================================
+    # Форматируем материалы
     materials_text = ""
     for area, items in materials.items():
         materials_text += f"\n### {area}\n"
@@ -140,24 +118,15 @@ def build_prompt(user_name, self_ratings, test_scores, materials):
             for v in videos:
                 materials_text += f"• [{v['name']}]({v['url']})\n"
     
-    # ============================================================
-    # ФОРМИРУЕМ ПРОМПТ С УСРЕДНЁННЫМИ ДАННЫМИ
-    # ============================================================
+    # Промпт
     prompt = f"""
 Ты — эксперт по компетенциям CSM 2.0.
 
 Пользователь: {user_name}
 
-### Данные по 8 областям (средние значения):
+### Данные по 8 областям:
 
-1. Осознание — самооценка: {self_avg[0]}/10, тест: {test_avg[0]}%
-2. Стратегия — самооценка: {self_avg[1]}/10, тест: {test_avg[1]}%
-3. Реинжиниринг процессов и оргструктуры — самооценка: {self_avg[2]}/10, тест: {test_avg[2]}%
-4. Проектирование и разработка решения — самооценка: {self_avg[3]}/10, тест: {test_avg[3]}%
-5. Внедрение и развитие решения — самооценка: {self_avg[4]}/10, тест: {test_avg[4]}%
-6. Общесистемные компетенции и методология проектов развития — самооценка: {self_avg[5]}/10, тест: {test_avg[5]}%
-7. Отраслевые компетенции — самооценка: {self_avg[6]}/10, тест: {test_avg[6]}%
-8. Soft skills — самооценка: {self_avg[7]}/10, тест: {test_avg[7]}%
+{data_text}
 
 ### Доступные материалы:
 {materials_text}
@@ -210,13 +179,14 @@ def build_prompt(user_name, self_ratings, test_scores, materials):
 НАЗВАНИЕ КАЖДОЙ ОБЛАСТИ В РЕКОМЕНДАЦИИ ВЫДЕЛЯЙ ЖИРНЫМ: **Название области**
 
 ### ВАЖНО:
-- Названия областей пиши в точности как в списке выше (первая буква заглавная, остальные строчные)
+- Названия областей пиши в точности как в списке выше
 - Не добавляй никаких советов, заключений или блоков "что делать дальше"
 - Не пиши области, которые не подходят под правила
 - Используй ТОЛЬКО ссылки из списка материалов
 - Ответ только на русском языке
 """
     return prompt
+    
 # ============================================================
 # РАБОТА С GigaChat
 # ============================================================
