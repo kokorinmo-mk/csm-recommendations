@@ -238,8 +238,32 @@ def recommend():
         
         user_name = data.get('userName')
         user_email = data.get('userEmail')
-        self_ratings = data.get('selfRatings', [])
-        test_scores = data.get('testScores', [])
+        
+        # Получаем данные в твоём формате (объекты с названиями областей)
+        self_ratings_dict = data.get('selfRatings', {})
+        test_scores_dict = data.get('testScores', {})
+        
+        print(f"📊 Самооценка (%): {self_ratings_dict}")
+        print(f"📊 Тест (%): {test_scores_dict}")
+        
+        # Список областей в правильном порядке
+        area_names = [
+            "Осознание",
+            "Стратегия",
+            "Реинжиниринг процессов и оргструктуры",
+            "Проектирование и разработка решения",
+            "Внедрение и развитие решения",
+            "Общесистемные компетенции и методология проектов развития",
+            "Отраслевые компетенции",
+            "Soft skills"
+        ]
+        
+        # Превращаем объекты в списки для удобства
+        self_ratings = [self_ratings_dict.get(name, 0) for name in area_names]
+        test_scores = [test_scores_dict.get(name, 0) for name in area_names]
+        
+        print(f"📊 Самооценка (список): {self_ratings}")
+        print(f"📊 Тест (список): {test_scores}")
         
         materials = load_materials_from_sheets()
         recommendations = get_gigachat_recommendations(user_name, self_ratings, test_scores, materials)
@@ -254,7 +278,3 @@ def recommend():
     except Exception as e:
         print(f"❌ Ошибка: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
-
-if __name__ == '__main__':
-    print("🚀 Запуск сервера CSM 2.0...")
-    app.run(host='0.0.0.0', port=5000, debug=True)
