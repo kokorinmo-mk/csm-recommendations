@@ -177,6 +177,18 @@ def build_prompt(user_name, user_email, self_ratings, test_scores, materials):
 def get_gigachat_recommendations(user_name, user_email, self_ratings, test_scores, materials):
     print(f"\n📊 Данные: самооценка={self_ratings}, тест={test_scores}")
     
+    # ============================================================
+    # ДИАГНОСТИКА — смотрим, какие материалы загрузились
+    # ============================================================
+    print(f"\n🔍 ДИАГНОСТИКА МАТЕРИАЛОВ:")
+    print(f"   - Всего областей в materials: {len(materials)}")
+    for area_name, items in materials.items():
+        courses = [item for item in items if item['name'].startswith('[Курс]')]
+        articles = [item for item in items if item['name'].startswith('[Статья]')]
+        videos = [item for item in items if item['name'].startswith('[Видео]')]
+        print(f"   - {area_name}: курсов={len(courses)}, статей={len(articles)}, видео={len(videos)}")
+    print(f"============================================================\n")
+    
     prompt = build_prompt(user_name, user_email, self_ratings, test_scores, materials)
     
     try:
