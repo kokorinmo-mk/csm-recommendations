@@ -19,7 +19,7 @@ GIGACHAT_CREDENTIALS = {
     "credentials": os.environ.get("GIGACHAT_CREDENTIALS", ""),
     "scope": "GIGACHAT_API_PERS",
     "verify_ssl_certs": False,
-    "model": "GigaChat"
+    "model": "GigaChat-Pro"        # или "GigaChat-2", "GigaChat-3"
 }
 
 MATERIALS_URL = "https://script.google.com/macros/s/AKfycbzOlrBj4ZY5iqStx3gUiF3Duecu0W8X26BfFsvNWJ6CoRLU7Hf2B7jDHnLVX4qE9m9w/exec"
