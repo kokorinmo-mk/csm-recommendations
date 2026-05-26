@@ -237,8 +237,10 @@ def recommend():
         else:
             return jsonify({"success": False, "message": "Частичная ошибка"}), 500
         
-    except Exception as e:
+        except Exception as e:
+        import traceback
         print(f"❌ Ошибка: {e}")
+        print(f"❌ Полный traceback:\n{traceback.format_exc()}")
         return jsonify({"success": False, "error": str(e)}), 500
 
 if __name__ == '__main__':
