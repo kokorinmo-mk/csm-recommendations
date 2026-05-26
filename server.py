@@ -125,10 +125,11 @@ def generate_recommendations(user_name, test_scores, materials):
         "Soft skills"
     ]
     
+    # test_scores — это словарь, например: {"Осознание": 100, "Стратегия": 50, ...}
     # Собираем области с процентом теста
     areas_with_scores = []
-    for i, name in enumerate(area_names):
-        score = test_scores[i] if i < len(test_scores) else 0
+    for name in area_names:
+        score = test_scores.get(name, 0)  # .get() для словаря
         areas_with_scores.append({"name": name, "score": score})
     
     # Сортируем по проценту (самые низкие первые)
