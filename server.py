@@ -67,8 +67,8 @@ def save_recommendations_to_sheets(user_name, user_email, recommendations):
 # ============================================================
 # ФОРМИРОВАНИЕ ПРОМПТА
 # ============================================================
-def build_prompt(user_name, self_ratings, test_scores, materials):
-    """self_ratings и test_scores — списки из 8 значений (самооценка в баллах 1-10, тест в %)"""
+def build_prompt(user_name, user_email, self_ratings, test_scores, materials):
+    """Формирует промпт с данными построчно"""
     
     area_names = [
         "Осознание",
@@ -81,12 +81,23 @@ def build_prompt(user_name, self_ratings, test_scores, materials):
         "Soft skills"
     ]
     
-    # Формируем строку с данными
-    data_text = ""
+    # Преобразуем списки в объекты с названиями областей
+    self_ratings_obj = {}
+    test_scores_obj = {}
+    
     for i, name in enumerate(area_names):
-        self_val = self_ratings[i] if i < len(self_ratings) else 0
-        test_val = test_scores[i] if i < len(test_scores) else 0
-        data_text += f"{name} — самооценка: {self_val}/10, тест: {test_val}%\n"
+        self_ratings_obj[name] = self_ratings[i] if i < len(self_ratings) else 0
+        test_scores_obj[name] = test_scores[i] if i < len(test_scores) else 0
+    
+    # Формируем строку с данными построчно
+    data_text = f"Имя: {user_name}\n"
+    data_text += f"Почта: {user_email}\n"
+    data_text += f"Самооценка:\n"
+    for name in area_names:
+        data_text += f"{name}: {self_ratings_obj[name]}\n"
+    data_text += f"Тест:\n"
+    for name in area_names:
+        data_text += f"{name}: {test_scores_obj[name]}%\n"
     
     # Форматируем материалы
     materials_text = ""
@@ -112,10 +123,7 @@ def build_prompt(user_name, self_ratings, test_scores, materials):
     prompt = f"""
 Ты — эксперт по компетенциям CSM 2.0.
 
-Пользователь: {user_name}
-
-### Данные по 8 областям:
-
+### Данные пользователя:
 {data_text}
 
 ### Доступные материалы:
