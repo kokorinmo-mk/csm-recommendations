@@ -174,10 +174,10 @@ def build_prompt(user_name, user_email, self_ratings, test_scores, materials):
 # ============================================================
 # РАБОТА С GigaChat
 # ============================================================
-def get_gigachat_recommendations(user_name, self_ratings, test_scores, materials):
+def get_gigachat_recommendations(user_name, user_email, self_ratings, test_scores, materials):
     print(f"\n📊 Данные: самооценка={self_ratings}, тест={test_scores}")
     
-    prompt = build_prompt(user_name, self_ratings, test_scores, materials)
+    prompt = build_prompt(user_name, user_email, self_ratings, test_scores, materials)
     
     try:
         with GigaChat(
@@ -255,7 +255,7 @@ def recommend():
         print(f"📊 Тест (список 8 значений): {test_scores}")
         
         materials = load_materials_from_sheets()
-        recommendations = get_gigachat_recommendations(user_name, self_ratings, test_scores, materials)
+        recommendations = get_gigachat_recommendations(user_name, user_email, self_ratings, test_scores, materials)
         
         saved = save_recommendations_to_sheets(user_name, user_email, recommendations)
         
