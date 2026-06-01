@@ -252,14 +252,9 @@ def recommend():
         user_name = data.get('userName')
         user_email = data.get('userEmail')
         
-        # Получаем данные в твоём формате (объекты с ключами-названиями областей)
         self_ratings_dict = data.get('selfRatings', {})
         test_scores_dict = data.get('testScores', {})
         
-        print(f"📊 Самооценка (сырые данные): {self_ratings_dict}")
-        print(f"📊 Тест (сырые данные): {test_scores_dict}")
-        
-        # Список ключей должен совпадать с тем, что приходит из index.html
         area_keys = [
             "Осознание",
             "Стратегия",
@@ -271,22 +266,22 @@ def recommend():
             "Soft skills"
         ]
         
-        # Преобразуем в простые списки (8 значений)
         self_ratings = [self_ratings_dict.get(key, 0) for key in area_keys]
         test_scores = [test_scores_dict.get(key, 0) for key in area_keys]
         
-        print(f"📊 Самооценка (список 8 значений): {self_ratings}")
-        print(f"📊 Тест (список 8 значений): {test_scores}")
+        print(f"📊 Самооценка: {self_ratings}")
+        print(f"📊 Тест: {test_scores}")
         
         materials = load_materials_from_sheets()
         recommendations = get_gigachat_recommendations(user_name, user_email, self_ratings, test_scores, materials)
         
-        saved = save_recommendations_to_sheets(user_name, user_email, recommendations)
+        save_recommendations_to_sheets(user_name, user_email, recommendations)
         
-        if saved:
-            return jsonify({"success": True, "message": "Рекомендации сохранены"})
-        else:
-            return jsonify({"success": False, "message": "Ошибка сохранения"}), 500
+        # ВОТ ЭТО ВАЖНО - возвращаем recommendations, а не "Рекомендации сохранены"
+        return jsonify({
+            "success": True, 
+            "message": recommendations   # ← САМИ РЕКОМЕНДАЦИИ
+        })
         
     except Exception as e:
         print(f"❌ Ошибка: {e}")
