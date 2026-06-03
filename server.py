@@ -3,45 +3,65 @@
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from gigachat import GigaChat
+from openai import OpenAI
+import os
 import requests
 
 app = Flask(__name__)
 CORS(app)
 
-GIGACHAT_CREDENTIALS = "MDE5ZDI0NDctNjhmMy03MjU5LTk1M2MtZTYwNzVjYjllNmI1OmU0ZjgyNjdmLTBlYjYtNDhjNC04MTJiLWFiNTJiYTlmM2VmMA=="
+# ============================================================
+# НАСТРОЙКИ QWEN через OpenRouter
+# ============================================================
 
+QWEN_API_KEY = "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"
+QWEN_BASE_URL = "https://openrouter.ai/api/v1"
+QWEN_MODEL = "qwen/qwen-2.5-72b-instruct"
+
+# Инициализация клиента
+client = OpenAI(
+    api_key=QWEN_API_KEY,
+    base_url=QWEN_BASE_URL,
+)
+
+# URL твоего Google Apps Script
 MATERIALS_URL = "https://script.google.com/macros/s/AKfycbzOlrBj4ZY5iqStx3gUiF3Duecu0W8X26BfFsvNWJ6CoRLU7Hf2B7jDHnLVX4qE9m9w/exec"
 
 def load_materials():
-    """Загружает материалы — ТОЛЬКО 3 НА ОБЛАСТЬ, чтобы не было timeout"""
+    """Загружает материалы из Google Apps Script (JSON)"""
     try:
         response = requests.get(MATERIALS_URL)
         data = response.json()
+        
         result = []
         for area, items in data.items():
             result.append(f"\n### {area}")
-            # Берём ТОЛЬКО 3 материала на область
-            for item in items[:3]:
+            # Берём первые 5 материалов на область, чтобы не перегружать
+            for item in items[:5]:
                 result.append(f"{item['name']} | {item['url']}")
-        print(f"✅ Загружено {len(result)} материалов (по 3 на область)")
+        
+        print(f"✅ Загружено материалов: {len(result)}")
         return "\n".join(result)
     except Exception as e:
-        print(f"Ошибка: {e}")
+        print(f"❌ Ошибка загрузки материалов: {e}")
         return ""
+
+@app.route('/', methods=['GET'])
+def index():
+    return jsonify({"status": "ok", "message": "Сервер CSM 2.0 работает на Qwen"})
 
 @app.route('/recommend', methods=['POST'])
 def recommend():
     try:
         data = request.get_json()
-        print(f"📨 Запрос от: {data.get('userName')}")
+        print(f"📨 Получен запрос от: {data.get('userName')}")
 
         user_name = data.get('userName')
         user_email = data.get('userEmail')
         test_scores = data.get('testScores', [])
 
         if not test_scores or len(test_scores) != 8:
-            return jsonify({"success": False, "error": "Некорректные данные"}), 400
+            return jsonify({"success": False, "error": "Некорректные данные теста"}), 400
 
         area_names = ["Осознание", "Стратегия", "Реинжиниринг", "Проектирование", "Внедрение", "Методология", "Отраслевые", "Soft skills"]
 
@@ -52,7 +72,6 @@ def recommend():
         materials_csv = load_materials()
 
         prompt = f"""
-
 Ты — эксперт по компетенциям CSM 2.0.
 
 ### ВХОДНЫЕ ДАННЫЕ:
@@ -117,21 +136,27 @@ def recommend():
 - Не добавляешь фраз вроде «нет материалов» — используешь только те ссылки, что есть в списке
 - Ответ строго на русском языке
 - ВСЕ ССЫЛКИ ДОЛЖНЫ БЫТЬ В ФОРМАТЕ [Название](URL). НЕЛЬЗЯ ПИСАТЬ URL ОТДЕЛЬНО.
-"""        
-        print("🤖 Отправляю запрос в GigaChat...")
+"""
 
-        with GigaChat(
-            credentials=GIGACHAT_CREDENTIALS,
-            scope="GIGACHAT_API_PERS",
-            verify_ssl_certs=False,
-            model="GigaChat",
-            timeout=180  # Увеличил до 180 секунд
-        ) as giga:
-            response = giga.chat(prompt)
-            recommendations = response.choices[0].message.content
-            print("✅ Рекомендации получены")
+        print("🤖 Отправляю запрос в Qwen...")
 
-            return jsonify({"success": True, "recommendations": recommendations})
+        response = client.chat.completions.create(
+            model=QWEN_MODEL,
+            messages=[
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.7,
+            max_tokens=4000,
+            timeout=120
+        )
+
+        recommendations = response.choices[0].message.content
+        print("✅ Рекомендации получены от Qwen")
+
+        return jsonify({
+            "success": True,
+            "recommendations": recommendations
+        })
 
     except Exception as e:
         print(f"❌ Ошибка: {e}")
