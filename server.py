@@ -14,14 +14,17 @@ GIGACHAT_CREDENTIALS = "MDE5ZDI0NDctNjhmMy03MjU5LTk1M2MtZTYwNzVjYjllNmI1OmU0Zjgy
 MATERIALS_URL = "https://script.google.com/macros/s/AKfycbzOlrBj4ZY5iqStx3gUiF3Duecu0W8X26BfFsvNWJ6CoRLU7Hf2B7jDHnLVX4qE9m9w/exec"
 
 def load_materials():
+    """Загружает материалы — ТОЛЬКО 3 НА ОБЛАСТЬ, чтобы не было timeout"""
     try:
         response = requests.get(MATERIALS_URL)
         data = response.json()
         result = []
         for area, items in data.items():
             result.append(f"\n### {area}")
-            for item in items:
+            # Берём ТОЛЬКО 3 материала на область
+            for item in items[:3]:
                 result.append(f"{item['name']} | {item['url']}")
+        print(f"✅ Загружено {len(result)} материалов (по 3 на область)")
         return "\n".join(result)
     except Exception as e:
         print(f"Ошибка: {e}")
@@ -122,7 +125,7 @@ def recommend():
             scope="GIGACHAT_API_PERS",
             verify_ssl_certs=False,
             model="GigaChat",
-            timeout=120
+            timeout=180  # Увеличил до 180 секунд
         ) as giga:
             response = giga.chat(prompt)
             recommendations = response.choices[0].message.content
