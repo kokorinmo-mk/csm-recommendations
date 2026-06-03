@@ -4,3 +4,4 @@ gigachat
 gunicorn
 sendgrid
 requests
+openai
