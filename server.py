@@ -16,7 +16,7 @@ CORS(app)
 
 QWEN_API_KEY = "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"
 QWEN_BASE_URL = "https://openrouter.ai/api/v1"
-QWEN_MODEL = "qwen/qwen-2.5-72b-instruct"
+QWEN_MODEL = "google/gemini-2.0-flash-lite-preview-02-05:free"
 
 # Инициализация клиента
 client = OpenAI(
