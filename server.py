@@ -13,7 +13,7 @@ CORS(app)
 GIGACHAT_CREDENTIALS = "MDE5ZDI0NDctNjhmMy03MjU5LTk1M2MtZTYwNzVjYjllNmI1OmU0ZjgyNjdmLTBlYjYtNDhjNC04MTJiLWFiNTJiYTlmM2VmMA=="
 
 # URL таблицы со ссылками
-MATERIALS_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQgRTJT7A9uBDdCNuqobPEI9-PRHqv2o2zcIJtx0wi4iFy4BGwSte5-kSZMhp8zJiI-MpMKZ80T6BKP/pub?output=csv"
+MATERIALS_URL = "https://script.google.com/macros/s/AKfycbzOlrBj4ZY5iqStx3gUiF3Duecu0W8X26BfFsvNWJ6CoRLU7Hf2B7jDHnLVX4qE9m9w/exec"
 
 def load_materials():
     """Загружает материалы из Google Sheets"""
