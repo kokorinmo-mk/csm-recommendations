@@ -12,22 +12,24 @@ CORS(app)
 
 GIGACHAT_CREDENTIALS = "MDE5ZDI0NDctNjhmMy03MjU5LTk1M2MtZTYwNzVjYjllNmI1OmU0ZjgyNjdmLTBlYjYtNDhjNC04MTJiLWFiNTJiYTlmM2VmMA=="
 
-# URL таблицы со ссылками
+# URL твоего Google Apps Script
 MATERIALS_URL = "https://script.google.com/macros/s/AKfycbzOlrBj4ZY5iqStx3gUiF3Duecu0W8X26BfFsvNWJ6CoRLU7Hf2B7jDHnLVX4qE9m9w/exec"
 
 def load_materials():
-    """Загружает материалы из Google Sheets"""
+    """Загружает материалы из Google Apps Script (JSON)"""
     try:
         response = requests.get(MATERIALS_URL)
-        response.encoding = 'utf-8'
-        lines = response.text.split('\n')
-        materials_text = ""
-        for line in lines[1:]:  # пропускаем заголовок
-            if line.strip():
-                materials_text += line + "\n"
-        return materials_text
+        data = response.json()
+        
+        result = []
+        for area, items in data.items():
+            result.append(f"\n### {area}")
+            for item in items:
+                result.append(f"{item['name']} | {item['url']}")
+        
+        return "\n".join(result)
     except Exception as e:
-        print(f"Ошибка загрузки: {e}")
+        print(f"Ошибка загрузки материалов: {e}")
         return ""
 
 @app.route('/', methods=['GET'])
@@ -59,7 +61,6 @@ def recommend():
         for i, name in enumerate(area_names):
             scores_text += f"{name}: {test_scores[i]}%\n"
         
-        # ТВОЙ ОРИГИНАЛЬНЫЙ ПРОМПТ + ДОБАВЛЕНА ТАБЛИЦА
         prompt = f"""
 
 Ты — эксперт по компетенциям CSM 2.0.
