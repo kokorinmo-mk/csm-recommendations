@@ -21,15 +21,21 @@ def load_materials():
         response = requests.get(MATERIALS_URL)
         data = response.json()
         
+        total_materials = 0
         result = []
         for area, items in data.items():
             result.append(f"\n### {area}")
             for item in items:
                 result.append(f"{item['name']} | {item['url']}")
+                total_materials += 1
+        
+        print(f"✅ Загружено материалов: {total_materials} из {len(data)} областей")
+        for area, items in data.items():
+            print(f"   - {area}: {len(items)} материалов")
         
         return "\n".join(result)
     except Exception as e:
-        print(f"Ошибка загрузки материалов: {e}")
+        print(f"❌ Ошибка загрузки материалов: {e}")
         return ""
 
 @app.route('/', methods=['GET'])
@@ -54,6 +60,10 @@ def recommend():
         
         # Загружаем материалы
         materials_csv = load_materials()
+        
+        # Если материалы не загрузились
+        if not materials_csv:
+            print("⚠️ Внимание: материалы не загружены, GigaChat может выдумывать ссылки")
         
         area_names = ["Осознание", "Стратегия", "Реинжиниринг", "Проектирование", "Внедрение", "Методология", "Отраслевые", "Soft skills"]
         
