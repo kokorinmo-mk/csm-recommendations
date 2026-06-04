@@ -12,16 +12,7 @@ CORS(app)
 
 QWEN_API_KEY = os.environ.get("QWEN_API_KEY")
 QWEN_BASE_URL = "https://openrouter.ai/api/v1"
-
-# АКТУАЛЬНЫЙ СПИСОК БЕСПЛАТНЫХ МОДЕЛЕЙ НА OPENROUTER (июнь 2026)
-FREE_MODELS = [
-    "openrouter/free",                          # Умный маршрутизатор
-    "google/gemma-2-27b-it:free",               # Gemma 2 27B
-    "meta-llama/llama-3.3-70b-instruct:free",   # Llama 3.3 70B
-    "mistralai/mistral-7b-instruct-v0.3:free",  # Mistral 7B
-    "microsoft/phi-3-mini-128k-instruct:free",  # Phi-3 Mini
-    "qwen/qwen-2.5-7b-instruct:free",           # Qwen 2.5 7B
-]
+QWEN_MODEL = "openrouter/free"
 
 client = OpenAI(
     api_key=QWEN_API_KEY,
@@ -31,36 +22,14 @@ client = OpenAI(
 MATERIALS_URL = "https://script.google.com/macros/s/AKfycbzOlrBj4ZY5iqStx3gUiF3Duecu0W8X26BfFsvNWJ6CoRLU7Hf2B7jDHnLVX4qE9m9w/exec"
 
 def load_materials():
+    """Загружает ТОЛЬКО нужные материалы для слабых областей"""
     try:
-        response = requests.get(MATERIALS_URL)
+        response = requests.get(MATERIALS_URL, timeout=10)
         data = response.json()
-        result = []
-        for area, items in data.items():
-            result.append(f"\n### {area}")
-            for item in items[:9]:
-                result.append(f"{item['name']} | {item['url']}")
-        print(f"✅ Загружено материалов: {len(result)}")
-        return "\n".join(result)
+        return data
     except Exception as e:
         print(f"❌ Ошибка загрузки: {e}")
-        return ""
-
-def get_recommendations_from_model(model_id, prompt):
-    print(f"   Пробую модель: {model_id}...")
-    try:
-        response = client.chat.completions.create(
-            model=model_id,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.7,
-            max_tokens=4000,
-            timeout=120
-        )
-        recommendations = response.choices[0].message.content
-        print(f"   ✅ Модель {model_id} ответила.")
-        return recommendations
-    except Exception as e:
-        print(f"   ❌ {model_id}: {str(e)[:100]}")
-        return None
+        return {}
 
 @app.route('/', methods=['GET'])
 def index():
@@ -81,72 +50,76 @@ def recommend():
 
         area_names = ["Осознание", "Стратегия", "Реинжиниринг", "Проектирование", "Внедрение", "Методология", "Отраслевые", "Soft skills"]
 
+        # Находим 3 самые слабые области
+        weak_areas = []
+        for i, score in enumerate(test_scores):
+            if score < 100:
+                weak_areas.append((area_names[i], score))
+        
+        weak_areas.sort(key=lambda x: x[1])
+        top_weak = weak_areas[:3]
+        
+        if not top_weak:
+            return jsonify({
+                "success": True,
+                "recommendations": f"🎉 Поздравляем, {user_name}! Вы набрали 100% по всем компетенциям!"
+            })
+        
+        # Загружаем все материалы
+        all_materials = load_materials()
+        
+        # Формируем короткий промпт ТОЛЬКО для слабых областей
+        materials_text = ""
+        for area, score in top_weak:
+            materials_text += f"\n### {area}\n"
+            if area in all_materials:
+                for item in all_materials[area][:9]:
+                    materials_text += f"{item['name']} | {item['url']}\n"
+        
         scores_text = ""
-        for i, name in enumerate(area_names):
-            scores_text += f"{name}: {test_scores[i]}%\n"
+        for area, score in top_weak:
+            scores_text += f"{area}: {score}%\n"
+        
+        prompt = f"""Ты эксперт CSM 2.0.
 
-        materials_csv = load_materials()
+Результаты пользователя {user_name}:
+{scores_text}
 
-        prompt = f"""
-Ты — эксперт по компетенциям CSM 2.0.
+Материалы для этих областей:
+{materials_text}
 
-### ВХОДНЫЕ ДАННЫЕ:
-- Имя пользователя: {user_name}
-- Почта пользователя: {user_email}
-- Результаты теста: {scores_text}
-- Список материалов:
-{materials_csv}
-
-### АЛГОРИТМ:
-1. Найди области с результатом < 100%
-2. Отсортируй их по возрастанию процентов (худшие первые)
-3. Возьми первые 3 области
-4. Для каждой области выбери 3 курса, 3 статьи, 3 видео
-
-### ВЫХОДНЫЕ ДАННЫЕ:
-
-{user_name}, ваши результаты теста CSM 2.0:
-
-**[Название области 1]**
+Для каждой области выбери 3 курса, 3 статьи, 3 видео.
+Формат:
+**Название области**
 📊 Результат: X%
-📚 Рекомендуем изучить:
 **[Курсы]**
-• [Название курса](ссылка)
-• [Название курса](ссылка)
-• [Название курса](ссылка)
+• [Название](ссылка)
+• [Название](ссылка)
+• [Название](ссылка)
 **[Статьи]**
-• [Название статьи](ссылка)
-• [Название статьи](ссылка)
-• [Название статьи](ссылка)
+• [Название](ссылка)
+• [Название](ссылка)
+• [Название](ссылка)
 **[Видео]**
-• [Название видео](ссылка)
-• [Название видео](ссылка)
-• [Название видео](ссылка)
+• [Название](ссылка)
+• [Название](ссылка)
+• [Название](ссылка)
 
-**(повторить для 2 и 3 области)**
+Только ссылки из списка выше. Только русский язык. Без лишних слов."""
 
-### ПРАВИЛА:
-- Только 3 самые слабые области
-- Только ссылки из списка выше
-- Формат ссылок: [Название](URL)
-- Без лишних советов
-- Только русский язык
-"""
+        print("🤖 Отправляю запрос в LLM...")
+        
+        response = client.chat.completions.create(
+            model=QWEN_MODEL,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.5,
+            max_tokens=3000,
+            timeout=60
+        )
 
-        if not QWEN_API_KEY:
-            return jsonify({"success": False, "error": "QWEN_API_KEY не настроен"}), 500
-
-        print("🤖 Отправляю запрос к моделям...")
-        recommendations = None
-        for model in FREE_MODELS:
-            recommendations = get_recommendations_from_model(model, prompt)
-            if recommendations:
-                break
-
-        if not recommendations:
-            return jsonify({"success": False, "error": "Все модели временно недоступны"}), 503
-
+        recommendations = f"{user_name}, ваши результаты теста CSM 2.0:\n\n{response.choices[0].message.content}"
         print("✅ Рекомендации получены")
+        
         return jsonify({"success": True, "recommendations": recommendations})
 
     except Exception as e:
