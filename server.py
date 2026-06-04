@@ -16,7 +16,7 @@ CORS(app)
 
 QWEN_API_KEY = os.environ.get("QWEN_API_KEY")
 QWEN_BASE_URL = "https://openrouter.ai/api/v1"
-QWEN_MODEL = "qwen/qwen-2.5-72b-instruct"
+QWEN_MODEL = "qwen/qwen3.6-plus-preview:free"  # БЕСПЛАТНО!
 
 if not QWEN_API_KEY:
     print("⚠️ ВНИМАНИЕ: QWEN_API_KEY не задан! Добавьте его в Environment Variables на Render")
