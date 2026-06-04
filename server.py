@@ -10,24 +10,18 @@ import requests
 app = Flask(__name__)
 CORS(app)
 
-# Ваш API-ключ OpenRouter (обязательно должен быть действительным!)
-QWEN_API_KEY = os.environ.get("QWEN_API_KEY") # ПРЕДПОЧТИТЕЛЬНЕЕ: добавьте переменную окружения
-if not QWEN_API_KEY:
-    # Если переменной окружения нет, укажите ключ здесь напрямую (менее безопасно, но для теста подойдет)
-    QWEN_API_KEY = "ВАШ_API_КЛЮЧ_OPENROUTER"
-
+QWEN_API_KEY = os.environ.get("QWEN_API_KEY")
 QWEN_BASE_URL = "https://openrouter.ai/api/v1"
 
-# --- СПИСОК БЕСПЛАТНЫХ МОДЕЛЕЙ (ПРОВЕРЕННЫЕ) ---
-# Модели будут вызываться по очереди, пока одна не ответит.
+# Список бесплатных моделей
 FREE_MODELS = [
-    "nvidia/nemotron-3-super",                # Мощная, 1M контекст, от NVIDIA
-    "google/gemma-4-31b-it:free",              # 256K контекст, от Google
-    "minimax/minimax-m2.5",                    # Хороша в кодинге
-    "qwen/qwen3.6-plus-preview:free",          # Qwen 3.6, 1M контекст
-    "baidu/cobuddy",                            # Быстрая кодовая модель от Baidu
-    "nvidia/nemotron-nano-9b-v2",              # Очень быстрая, для простых задач
-    "openrouter/free",                         # Умный маршрутизатор, который сам выбирает лучшую
+    "nvidia/nemotron-3-super",
+    "google/gemma-4-31b-it:free",
+    "minimax/minimax-m2.5",
+    "qwen/qwen3.6-plus-preview:free",
+    "baidu/cobuddy",
+    "nvidia/nemotron-nano-9b-v2",
+    "openrouter/free",
 ]
 
 client = OpenAI(
@@ -38,27 +32,22 @@ client = OpenAI(
 MATERIALS_URL = "https://script.google.com/macros/s/AKfycbzOlrBj4ZY5iqStx3gUiF3Duecu0W8X26BfFsvNWJ6CoRLU7Hf2B7jDHnLVX4qE9m9w/exec"
 
 def load_materials():
-    """Загружает ВСЕ материалы из Google Apps Script"""
+    """Загружает материалы из Google Apps Script (JSON)"""
     try:
         response = requests.get(MATERIALS_URL)
         data = response.json()
-        
         result = []
-        total = 0
         for area, items in data.items():
             result.append(f"\n### {area}")
-            for item in items:
+            for item in items[:9]:  # 9 материалов = 3 курса + 3 статьи + 3 видео
                 result.append(f"{item['name']} | {item['url']}")
-                total += 1
-        
-        print(f"✅ Загружено ВСЕХ материалов: {total}")
+        print(f"✅ Загружено материалов: {len(result)}")
         return "\n".join(result)
     except Exception as e:
         print(f"❌ Ошибка загрузки материалов: {e}")
         return ""
 
 def get_recommendations_from_model(model_id, prompt):
-    """Пытается получить ответ от указанной модели."""
     print(f"   Пробую модель: {model_id}...")
     try:
         response = client.chat.completions.create(
@@ -66,7 +55,7 @@ def get_recommendations_from_model(model_id, prompt):
             messages=[{"role": "user", "content": prompt}],
             temperature=0.7,
             max_tokens=4000,
-            timeout=90 # Уменьшаем таймаут для быстрой смены модели
+            timeout=90
         )
         recommendations = response.choices[0].message.content
         print(f"   ✅ Модель {model_id} ответила успешно.")
@@ -77,7 +66,7 @@ def get_recommendations_from_model(model_id, prompt):
 
 @app.route('/', methods=['GET'])
 def index():
-    return jsonify({"status": "ok", "message": "Сервер CSM 2.0 работает с несколькими бесплатными LLM"})
+    return jsonify({"status": "ok", "message": "Сервер CSM 2.0 работает"})
 
 @app.route('/recommend', methods=['POST'])
 def recommend():
@@ -100,7 +89,6 @@ def recommend():
 
         materials_csv = load_materials()
 
-        # Ваш оригинальный промпт, который вы считаете правильным (он не менялся)
         prompt = f"""
 Ты — эксперт по компетенциям CSM 2.0.
 
@@ -108,16 +96,19 @@ def recommend():
 - Имя пользователя: {user_name}
 - Почта пользователя: {user_email}
 - Результаты теста: {scores_text}
-- Список материалов:
+- Список материалов (для каждой области: 3 курса, 3 статьи, 3 видео):
 {materials_csv}
 
 ### АЛГОРИТМ:
 1. Найди области с результатом < 100%
-2. Отсортируй их по возрастанию (худшие первые)
+2. Отсортируй их по возрастанию процентов (худшие первые)
 3. Возьми первые 3 области
-4. Для каждой области выбери 3 курса, 3 статьи, 3 видео
+4. Для КАЖДОЙ из выбранных областей:
+   - Выбери 3 курса из списка материалов для этой области
+   - Выбери 3 статьи из списка материалов для этой области
+   - Выбери 3 видео из списка материалов для этой области
 
-### ВЫХОДНЫЕ ДАННЫЕ:
+### ВЫХОДНЫЕ ДАННЫЕ (строго по шаблону):
 
 {user_name}, ваши результаты теста CSM 2.0:
 
@@ -125,36 +116,62 @@ def recommend():
 📊 Результат: X%
 📚 Рекомендуем изучить:
 **[Курсы]**
-• [Название](ссылка)
-• [Название](ссылка)
-• [Название](ссылка)
+• [Название курса](ссылка)
+• [Название курса](ссылка)
+• [Название курса](ссылка)
 **[Статьи]**
-• [Название](ссылка)
-• [Название](ссылка)
-• [Название](ссылка)
+• [Название статьи](ссылка)
+• [Название статьи](ссылка)
+• [Название статьи](ссылка)
 **[Видео]**
-• [Название](ссылка)
-• [Название](ссылка)
-• [Название](ссылка)
+• [Название видео](ссылка)
+• [Название видео](ссылка)
+• [Название видео](ссылка)
 
 **[Название области 2]**
-... (то же самое)
+📊 Результат: X%
+📚 Рекомендуем изучить:
+**[Курсы]**
+• [Название курса](ссылка)
+• [Название курса](ссылка)
+• [Название курса](ссылка)
+**[Статьи]**
+• [Название статьи](ссылка)
+• [Название статьи](ссылка)
+• [Название статьи](ссылка)
+**[Видео]**
+• [Название видео](ссылка)
+• [Название видео](ссылка)
+• [Название видео](ссылка)
 
 **[Название области 3]**
-... (то же самое)
+📊 Результат: X%
+📚 Рекомендуем изучить:
+**[Курсы]**
+• [Название курса](ссылка)
+• [Название курса](ссылка)
+• [Название курса](ссылка)
+**[Статьи]**
+• [Название статьи](ссылка)
+• [Название статьи](ссылка)
+• [Название статьи](ссылка)
+**[Видео]**
+• [Название видео](ссылка)
+• [Название видео](ссылка)
+• [Название видео](ссылка)
 
 ### ПРАВИЛА:
-- Только 3 самые слабые области
-- Только ссылки из списка выше
+- ТОЛЬКО 3 самые слабые области
+- ТОЛЬКО ссылки из списка материалов выше
 - Формат ссылок: [Название](URL)
-- Без лишних советов
-- Только русский язык
+- НЕ ДОБАВЛЯЙ никаких советов, выводов, "что делать дальше"
+- ОТВЕТ ТОЛЬКО НА РУССКОМ ЯЗЫКЕ
 """
 
         if not QWEN_API_KEY:
             return jsonify({"success": False, "error": "QWEN_API_KEY не настроен"}), 500
 
-        print("🤖 Отправляю запросы к моделям (список):")
+        print("🤖 Отправляю запрос к моделям...")
         recommendations = None
         for model in FREE_MODELS:
             recommendations = get_recommendations_from_model(model, prompt)
@@ -162,14 +179,13 @@ def recommend():
                 break
 
         if not recommendations:
-            print("❌ Ни одна модель не смогла ответить.")
-            return jsonify({"success": False, "error": "Сервис временно недоступен. Попробуйте позже."}), 503
+            return jsonify({"success": False, "error": "Сервис временно недоступен"}), 503
 
-        print("✅ Рекомендации успешно получены.")
+        print("✅ Рекомендации получены")
         return jsonify({"success": True, "recommendations": recommendations})
 
     except Exception as e:
-        print(f"❌ Непредвиденная ошибка: {e}")
+        print(f"❌ Ошибка: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
 if __name__ == '__main__':
