@@ -4,18 +4,22 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from openai import OpenAI
+import os
 import requests
 
 app = Flask(__name__)
 CORS(app)
 
 # ============================================================
-# БЕСПЛАТНЫЙ QWEN 3.6 через OpenRouter
+# КЛЮЧ БЕРЁТСЯ ИЗ ПЕРЕМЕННЫХ ОКРУЖЕНИЯ (Render Environment Variables)
 # ============================================================
 
-QWEN_API_KEY = "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"
+QWEN_API_KEY = os.environ.get("QWEN_API_KEY")
 QWEN_BASE_URL = "https://openrouter.ai/api/v1"
-QWEN_MODEL = "qwen/qwen3.6-plus-preview:free"
+QWEN_MODEL = "qwen/qwen-2.5-72b-instruct"
+
+if not QWEN_API_KEY:
+    print("⚠️ ВНИМАНИЕ: QWEN_API_KEY не задан! Добавьте его в Environment Variables на Render")
 
 client = OpenAI(
     api_key=QWEN_API_KEY,
@@ -41,7 +45,7 @@ def load_materials():
 
 @app.route('/', methods=['GET'])
 def index():
-    return jsonify({"status": "ok", "message": "Сервер CSM 2.0 работает на бесплатном Qwen 3.6"})
+    return jsonify({"status": "ok", "message": "Сервер CSM 2.0 работает на Qwen"})
 
 @app.route('/recommend', methods=['POST'])
 def recommend():
@@ -100,7 +104,11 @@ def recommend():
 • [Название](ссылка)
 • [Название](ссылка)
 
-**(повторить для 2 и 3 области)**
+**[Название области 2]**
+... (то же самое)
+
+**[Название области 3]**
+... (то же самое)
 
 ### ПРАВИЛА:
 - Только 3 самые слабые области
@@ -110,7 +118,10 @@ def recommend():
 - Только русский язык
 """
 
-        print("🤖 Отправляю запрос в Qwen 3.6...")
+        if not QWEN_API_KEY:
+            return jsonify({"success": False, "error": "QWEN_API_KEY не настроен"}), 500
+
+        print("🤖 Отправляю запрос в Qwen...")
 
         response = client.chat.completions.create(
             model=QWEN_MODEL,
@@ -121,7 +132,7 @@ def recommend():
         )
 
         recommendations = response.choices[0].message.content
-        print("✅ Рекомендации получены от Qwen 3.6")
+        print("✅ Рекомендации получены от Qwen")
 
         return jsonify({"success": True, "recommendations": recommendations})
 
