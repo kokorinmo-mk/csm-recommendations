@@ -38,16 +38,20 @@ client = OpenAI(
 MATERIALS_URL = "https://script.google.com/macros/s/AKfycbzOlrBj4ZY5iqStx3gUiF3Duecu0W8X26BfFsvNWJ6CoRLU7Hf2B7jDHnLVX4qE9m9w/exec"
 
 def load_materials():
-    """Загружает материалы из Google Apps Script (JSON)"""
+    """Загружает ВСЕ материалы из Google Apps Script"""
     try:
         response = requests.get(MATERIALS_URL)
         data = response.json()
+        
         result = []
+        total = 0
         for area, items in data.items():
             result.append(f"\n### {area}")
-            for item in items[:5]:
+            for item in items:
                 result.append(f"{item['name']} | {item['url']}")
-        print(f"✅ Загружено материалов: {len(result)}")
+                total += 1
+        
+        print(f"✅ Загружено ВСЕХ материалов: {total}")
         return "\n".join(result)
     except Exception as e:
         print(f"❌ Ошибка загрузки материалов: {e}")
