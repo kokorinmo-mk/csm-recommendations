@@ -13,15 +13,14 @@ CORS(app)
 QWEN_API_KEY = os.environ.get("QWEN_API_KEY")
 QWEN_BASE_URL = "https://openrouter.ai/api/v1"
 
-# Список бесплатных моделей
+# АКТУАЛЬНЫЙ СПИСОК БЕСПЛАТНЫХ МОДЕЛЕЙ НА OPENROUTER (июнь 2026)
 FREE_MODELS = [
-    "nvidia/nemotron-3-super",
-    "google/gemma-4-31b-it:free",
-    "minimax/minimax-m2.5",
-    "qwen/qwen3.6-plus-preview:free",
-    "baidu/cobuddy",
-    "nvidia/nemotron-nano-9b-v2",
-    "openrouter/free",
+    "openrouter/free",                          # Умный маршрутизатор
+    "google/gemma-2-27b-it:free",               # Gemma 2 27B
+    "meta-llama/llama-3.3-70b-instruct:free",   # Llama 3.3 70B
+    "mistralai/mistral-7b-instruct-v0.3:free",  # Mistral 7B
+    "microsoft/phi-3-mini-128k-instruct:free",  # Phi-3 Mini
+    "qwen/qwen-2.5-7b-instruct:free",           # Qwen 2.5 7B
 ]
 
 client = OpenAI(
@@ -32,19 +31,18 @@ client = OpenAI(
 MATERIALS_URL = "https://script.google.com/macros/s/AKfycbzOlrBj4ZY5iqStx3gUiF3Duecu0W8X26BfFsvNWJ6CoRLU7Hf2B7jDHnLVX4qE9m9w/exec"
 
 def load_materials():
-    """Загружает материалы из Google Apps Script (JSON)"""
     try:
         response = requests.get(MATERIALS_URL)
         data = response.json()
         result = []
         for area, items in data.items():
             result.append(f"\n### {area}")
-            for item in items[:9]:  # 9 материалов = 3 курса + 3 статьи + 3 видео
+            for item in items[:9]:
                 result.append(f"{item['name']} | {item['url']}")
         print(f"✅ Загружено материалов: {len(result)}")
         return "\n".join(result)
     except Exception as e:
-        print(f"❌ Ошибка загрузки материалов: {e}")
+        print(f"❌ Ошибка загрузки: {e}")
         return ""
 
 def get_recommendations_from_model(model_id, prompt):
@@ -55,13 +53,13 @@ def get_recommendations_from_model(model_id, prompt):
             messages=[{"role": "user", "content": prompt}],
             temperature=0.7,
             max_tokens=4000,
-            timeout=90
+            timeout=120
         )
         recommendations = response.choices[0].message.content
-        print(f"   ✅ Модель {model_id} ответила успешно.")
+        print(f"   ✅ Модель {model_id} ответила.")
         return recommendations
     except Exception as e:
-        print(f"   ❌ Модель {model_id} не отвечает: {e}")
+        print(f"   ❌ {model_id}: {str(e)[:100]}")
         return None
 
 @app.route('/', methods=['GET'])
@@ -96,19 +94,16 @@ def recommend():
 - Имя пользователя: {user_name}
 - Почта пользователя: {user_email}
 - Результаты теста: {scores_text}
-- Список материалов (для каждой области: 3 курса, 3 статьи, 3 видео):
+- Список материалов:
 {materials_csv}
 
 ### АЛГОРИТМ:
 1. Найди области с результатом < 100%
 2. Отсортируй их по возрастанию процентов (худшие первые)
 3. Возьми первые 3 области
-4. Для КАЖДОЙ из выбранных областей:
-   - Выбери 3 курса из списка материалов для этой области
-   - Выбери 3 статьи из списка материалов для этой области
-   - Выбери 3 видео из списка материалов для этой области
+4. Для каждой области выбери 3 курса, 3 статьи, 3 видео
 
-### ВЫХОДНЫЕ ДАННЫЕ (строго по шаблону):
+### ВЫХОДНЫЕ ДАННЫЕ:
 
 {user_name}, ваши результаты теста CSM 2.0:
 
@@ -128,44 +123,14 @@ def recommend():
 • [Название видео](ссылка)
 • [Название видео](ссылка)
 
-**[Название области 2]**
-📊 Результат: X%
-📚 Рекомендуем изучить:
-**[Курсы]**
-• [Название курса](ссылка)
-• [Название курса](ссылка)
-• [Название курса](ссылка)
-**[Статьи]**
-• [Название статьи](ссылка)
-• [Название статьи](ссылка)
-• [Название статьи](ссылка)
-**[Видео]**
-• [Название видео](ссылка)
-• [Название видео](ссылка)
-• [Название видео](ссылка)
-
-**[Название области 3]**
-📊 Результат: X%
-📚 Рекомендуем изучить:
-**[Курсы]**
-• [Название курса](ссылка)
-• [Название курса](ссылка)
-• [Название курса](ссылка)
-**[Статьи]**
-• [Название статьи](ссылка)
-• [Название статьи](ссылка)
-• [Название статьи](ссылка)
-**[Видео]**
-• [Название видео](ссылка)
-• [Название видео](ссылка)
-• [Название видео](ссылка)
+**(повторить для 2 и 3 области)**
 
 ### ПРАВИЛА:
-- ТОЛЬКО 3 самые слабые области
-- ТОЛЬКО ссылки из списка материалов выше
+- Только 3 самые слабые области
+- Только ссылки из списка выше
 - Формат ссылок: [Название](URL)
-- НЕ ДОБАВЛЯЙ никаких советов, выводов, "что делать дальше"
-- ОТВЕТ ТОЛЬКО НА РУССКОМ ЯЗЫКЕ
+- Без лишних советов
+- Только русский язык
 """
 
         if not QWEN_API_KEY:
@@ -179,7 +144,7 @@ def recommend():
                 break
 
         if not recommendations:
-            return jsonify({"success": False, "error": "Сервис временно недоступен"}), 503
+            return jsonify({"success": False, "error": "Все модели временно недоступны"}), 503
 
         print("✅ Рекомендации получены")
         return jsonify({"success": True, "recommendations": recommendations})
